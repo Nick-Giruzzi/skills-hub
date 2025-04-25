@@ -1,0 +1,15 @@
+[Unit]
+Description=Skillz Labs Server Service
+After=network.target dnsmasq.service
+Wants=network.target dnsmasq.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/user/skillsHub/
+ExecStart=python3 /home/user/skillsHub/app.py
+ExecStop=-/usr/bin/pkill -f app.py
+#ExecStopPost=-rm /home/user/skillsHub/hub.db
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

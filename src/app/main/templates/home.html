@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block header %}
+{% endblock %}
+
+{% block content %}
+
+<div class="page_name">
+    <h2>{{g.globs.challenge_name}}</h2>
+</div>
+
+<div class="welcome-message">
+    <form>
+        <fieldset style="width:70%;">
+            <table class="res-table">
+                <thead class="res-thead">
+                    <th class="home_table_page">Page</th>
+                    <th class="home_table_func">Function</th>
+                </thead>
+                <tr>
+                    <td class="home_table_page">Home</td>
+                    <td class="home_table_func">This landing page</td>
+                </tr>
+                {% if g.globs.info_home_enabled %}
+                <tr onclick="window.location.href='{{ url_for('info.home') }}';">
+                    <td class="home_table_page">Getting Started</td>
+                    <td class="home_table_func">Information about the lab and how to get started.</td>
+                </tr>
+                {% endif %}
+                {% if g.globs.grading_enabled %}
+                <tr onclick="window.location.href='{{ url_for('main.tasks') }}';">
+                    <td class="home_table_page">Tasks</td>
+                    <td class="home_table_func">Current graded tasks. Current tasks might change
+                        as you progress through the lab.</td>
+                </tr>
+                {% endif %}
+                {% if g.globs.grading_enabled %}
+                <tr onclick="window.location.href='{{ url_for('main.results') }}';">
+                    <td class="home_table_page">Results</td>
+                    <td class="home_table_func">Results of the last grading attempt.</td>
+                </tr>
+                {% endif %}
+                {% if g.globs.services_home_enabled == True %}
+                <tr onclick="window.location.href='{{ url_for('info.services') }}';">
+                    <td class="home_table_page">Services</td>
+                    <td class="home_table_func">Status of network services.
+                        This page can be useful for troubleshooting.</td>
+                </tr>
+                {% endif %}
+                {% if g.globs.hosted_files_enabled %}
+                <tr onclick="window.location.href='{{ url_for('main.list_files') }}';">
+                    <td class="home_table_page">Hosted Files</td>
+                    <td class="home_table_func">Download Files</td>
+                </tr>
+                {% endif %}
+                {% if g.globs.bookmarks != None %}
+                <tr onclick="window.location.href='{{ url_for('info.bookmarks') }}';">
+                    <td class="home_table_page">Bookmarks</td>
+                    <td class="home_table_func">Provides all the in-game links that will be referenced in the lab guide.</td>
+                </tr>
+                {% endif %}
+            </table>
+        </fieldset>
+    </form>
+</div>
+
+
+{% endblock %}
+

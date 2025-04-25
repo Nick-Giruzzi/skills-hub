@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Tasks{% endblock %}
+
+{% block header %}
+
+
+{% endblock %}
+{% block content %}
+
+<div class="page_name">
+    <h2>Tasking</h2>
+</div>
+
+{% if g.globs.grading_enabled == False %}
+    <span id="title" style="padding-top:20px;">
+        There is no grading for this lab.
+    </span>
+{% else %}
+    <form method="POST" action="{{url_for('main.grade')}}" enctype="multipart/form-data" id="min-top-padding">
+    <fieldset class="task">
+        <table class="res-table">
+            {% if 'mc' in questions.keys() %}
+                <thead class="res-thead" >
+                    <th class="q_item1"><label>Question</label></th>
+                    <th class="q_item2"><label>Answer</label></th>
+                </thead>
+                {% for k,v in questions['mc'].items() %}
+                    <tr class="bodypost">
+                        <td class="txt_format">{{v['text']}}</td>
+                        <td>
+                        {% for opt, ans in v['opts'].items() %}
+                            <label class="form-control">
+                                <input type="radio" id="{{ opt }}" name="{{ k }}" value="{{ opt }}">
+                                {{ ans }}
+                            </label>
+                        {% endfor %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            {% endif %}
+            {% if 'text' in questions.keys() %}
+                <thead class="res-thead" >
+                    <th class="q_item1"><label>Task</label></th>
+                    <th class="q_item2"><label>Submission</label></th>
+                </thead>
+                {% for key, value in questions['text'].items() %}
+                    <tr class="bodypost">
+                        <td class="q_item1"><label>{{ value['text'] }}</label></td>
+                        <td class="q_item2"><input type='text' name="{{key}}" placeholder="" required></td>
+                    </tr>
+                {% endfor %}
+            {% endif %}
+            {% if 'upload' in questions.keys() %}
+                <thead class="res-thead" >
+                    <th class="q_item1"><label>Task</label></th>
+                    <th class="q_item2"><label>File</label></th>
+                </thead>
+                {% for k,v in questions['upload'].items() %}
+                    <tr class="bodypost">
+                        <td class="q_item1"><label>{{ v['text'] }}</label></td>
+                        <td class="q_item2">
+                            <select id="files" name="{{k}}" required>
+                                <option value="none" selected disabled>N/A</option>
+                                {% for uf in g.globs.filelist %}
+                                    <option id="{{uf}}" name="{{k}}" value="{{uf}}">{{uf}}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                {% endfor %}
+            {% endif %}
+            {% if 'button' in questions.keys() %}
+                <tr class="bodypost" style="padding-top: 15px;font-size: 20px;">
+                    <th colspan=2 class="q_long_line">Tasks below will be graded once 'submit' button is clicked.</th>
+                </tr>   
+                {% for key, value in questions['button'].items() %}
+                    <tr class="bodypost">
+                        <td colspan=2 class="q_long_line_q"><label>{{ value['text'] }}</label></td>
+                        <td hidden><input type="hidden" name="{{key}}"></td>
+                    </tr>
+                {% endfor %}
+            {% endif %}
+            {% if 'cron' in questions.keys()  %}
+                <tr class="bodypost">
+                    <th colspan=2 class="q_long_line">Tasks below will be auto-graded and are checked 
+                    {% if g.globs.cron_type == 'at' %}
+                        at {{ g.globs.cron_at }}
+                    {% else %}
+                        every {{ g.globs.cron_interval }} seconds
+                    {% endif %}        
+                    </th>
+                </tr>
+                {% for key, value in questions['cron'].items() %}
+                    <tr class="bodypost">
+                        <td colspan=2 class="q_long_line_q"><label>{{ value['text'] }}</label></td>
+                    </tr>
+                {% endfor %}
+            {% endif %}
+        </table>
+        <br>
+        <input type="submit" name="submit" value="Submit" style="font-size: 20px;">
+    </fieldset>
+    </form>
+
+{% if 'upload' in questions.keys() %}
+    <div id="shop-navbar" class="sticky-navbar">
+        <ul id="fList">
+            <li style="pointer-events:none;"><u>Upload File!</u></li>
+            <li>
+                <form method="POST" id="upForm" enctype="multipart/form-data"> <!--  action="{{ url_for('main.upload')}}"   -->
+                    <input type="file" class="text" name="file_upload" required>
+                    <input type="submit" class="text" value="Upload">
+                </form>
+            </li>
+            <li style="pointer-events:none;"><u>Files Uploaded</u></li>
+            <div id="sub-flist">
+                {% for uf in g.globs.filelist %}
+                    <li style="pointer-events:none;">{{uf}}</li>
+                {% endfor %}
+            </div>
+        </ul>
+    </div>
+
+    <script type="text/javascript" src="{{ url_for('main.static', filename='js/upload.js') }}"></script>
+{% endif %}
+
+{% endif %}
+{% endblock %}

@@ -1,0 +1,105 @@
+# Please read the `config_README.md` file to get detailed explanation of available configurations.
+lab_name: ""
+
+app:
+  host: "0.0.0.0"
+  port: 8888
+
+startup:
+  # Set this to false if you don't want your startup scripts to run in a workspace (only in a gamespace)
+  runInWorkspace: true
+  scripts: 
+    - startup.py
+
+# required_services:
+  ## Example: Ensure you can ping this host before startup scripts kick off
+  # - host: example.us
+  #   type: ping
+  #   block_startup_scripts: true
+
+  ## Example: Ensure you can reach this host on port 22 before startup scripts kick off
+  # - host: example.us
+  #   port: 22
+  #   type: socket
+  #   block_startup_scripts: true
+
+  ## Example: Ensure you can complete a web request to http://example.us:8888/example. Don't wait for this to be available before startup scripts. 
+  # - host: example.us
+  #   port: 8888
+  #   type: web
+  #   path: /example
+  #   block_startup_scripts: false
+  
+hosted_files: 
+  # Set this to true if you have files that need to be hosted
+  enabled: false
+
+info_and_services:
+  info_home_enabled: false
+  services_home_enabled: false
+  bookmarks_enabled: true
+  bookmarks:
+    mail: "https://box.skills.hub/"
+    firewall: "https://pfsense.skills.hub/"
+
+# services_to_log:
+  ## Example: 
+  #- host: '10.4.4.251'
+  #  user: user
+  #  password: tartans
+  #  service: pump.service
+
+  #- host: '10.4.4.250'
+  #  user: user
+  #  password: tartans
+  #  service: update.service
+
+grading:
+  enabled: true
+  grader_post: false
+  manual_grading: true
+  manual_grading_script: manualGradingExample.py
+  cron_grading: false
+  cron_grading_script: null
+  cron_interval: 5
+  cron_at: null
+  cron_delay: 10
+  cron_limit: null
+  rate_limit: 0
+  token_location: static
+  tokens:
+    GradingCheck1: "abcdefg"
+    GradingCheck2: "1234567"
+    GradingCheck3: "a1b2c3d"
+
+  submission: 
+    method: display
+    grader_url: "https://presidentscup.cisa.gov/gb/pc/"
+    grader_key: "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+  parts:
+    GradingCheck1:    
+      token_name: Q1  
+      text: "What is the correct choice?"
+      mode: mc
+      opts:
+        a: "answer1"
+        b: "correct answer"
+        c: "answer3"
+    GradingCheck2: 
+      token_name: Q2
+      text: "This is example question 2"
+      mode: upload
+    GradingCheck3:  
+      token_name: Q3
+      text: "This is the 3rd example question"
+      mode: button
+
+
+  phases: true
+  phase_info:
+    phase1: ["GradingCheck1"]
+    phase2: ["GradingCheck2"]
+    phase3: ["GradingCheck3"]
+    #mini_lab: []
+
