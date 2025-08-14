@@ -1,5 +1,11 @@
-# Skills Hub Server Configuration 
+# Skills Hub
 _This file will explain the various configurations available to the developer_
+
+### Command Line Options
+
+`--log-level [level]` - Use this option to specify the level at which you want to log. These levels are from the standard [Python logging levels](https://docs.python.org/3/library/logging.html#logging-levels). The default level is `INFO`. Example: `--debug ERROR` will show logs at the error level.
+
+`--debug` - Enable debug logging. This option overrides the log level specified via `--log-level` to enable `DEBUG` level logs.
 
 ## Static IP addresses and Valid Commit State
 
@@ -118,18 +124,18 @@ By default they are disabled, but if you would like to use either of these then 
 
 To improve the user's interaction with the lab environment, we have implemented a bookmark'ing feature. This will allow the developer to add direct links to resources in-game that will be required to be used by the user.
 
-It is enabled by default and has two entries, `mail` and `firewall`. The entries are written in a key:value format where the `key` is the name of the resource and is what will be shown as the resource name on the page. The `value` is the URL that will be shown and used as the hyperlink. 
+It is disabled by default, but has two entries prepared: `mail` and `firewall`. The entries are written in a key:value format where the `key` is the name of the resource and is what will be shown as the resource name on the page. The `value` is the URL that will be shown and used as the hyperlink. 
 
 If you want to add more, just append more entries under the `bookmarks` section in `info_and_services`.
 
-If you want to disable it, set `bookmarks_enabled` to `false`.
+If you want to enable it, set `bookmarks_enabled` to `true`.
 
 NOTE: These have not been thoroughly tested, so there may be unknown bugs present. 
 
 ### Section:&emsp;services_to_log
 _Contains optional configurations where remote services can be polled and have their logs be sent to graylog_
 
-> List all of the **SYSTEMD** services that logging is required for your challenge to operate. <br>All of the listed services will have periodic checks sending their logs to graylog. <br>This section is intended to be used as a way to log the status of services throughout the lab in order to support troubleshooting. It is disabled by default.
+> List all of the **SYSTEMD** services that logging is required for your lab to operate. <br>All of the listed services will have periodic checks sending their logs to graylog. <br>This section is intended to be used as a way to log the status of services throughout the lab in order to support troubleshooting. It is disabled by default.
 
 There are four parameters for each service to be logged and they are all required.
 
@@ -158,10 +164,46 @@ Some things you should note of to better understand the configuration options.
   - text    -- this option will configure its associated question to prompt the user a text box to be solved. 
   - button  -- This option will configure its associated question to be graded by the grading script when pressed.
   - mc      -- This option will configure its associated question to be a Multiple Choice question and have the answer selected be passed to the grading script.
+  - upload  -- This option will configure its associated question to allow uploading of a file to the Skills Hub for grading. Uploaded files are placed in `/home/user/skillsHub/uploaded_files` directory.
   - cron    -- this option will configure its associated question to be graded automatically every so often based on the settings below.
 - The term `manual` is used to describe a grading mode other than `cron`. 
   - This generally refers to the question types `button` and `text` since they require an interaction in order to be graded.
 - Due to the nature of how manual grading occurs Vs cron grading, each mode requires its own grading script.
+
+##### Examples of yml config for each question type
+
+```yml
+parts:
+  # Question Type: text
+  GradingCheck1:
+    token_name: Q1
+    text: "Who discovered gravity?"
+    mode: text
+  # Question Type: button
+  GradingCheck2:
+    token_name: Q2
+    text: "Click button for grading."
+    mode: button
+  # Question Type: mc
+  GradingCheck3:
+    token_name: Q3
+    text: "What option do you choose?"
+    mode: mc
+    opts:
+      a: "answer1"
+      b: "answer2"
+      c: "answer3"
+  # Question Type: upload
+  GradingCheck4:
+    token_name: Q4
+    text: "Upload a script to perform addition."
+    mode: upload
+  # Question Type: cron
+  GradingCheck5:
+    token_name: Q5
+    text: "Grading will occur automatically on fixed interval that is set in the config.yml file."
+    mode: cron
+```
 
 #### Configuration Options
 _Contains options that relate to grading of both manual and cron type questions_ 
@@ -282,3 +324,11 @@ The `config.yml` files default configuration will present an example of how to d
 
 Also Note: The entry `mini_lab` is commented out in the phase section, but caed and used if the developer wishes.
 
+### Mini-Challenge Files
+
+If your challenge has a 'Mini-lab" aspect to it and require additional files for it, the Skills Hub now offers functionality to automatically move those files to the `hosted_files` directory upon starting the `mini-lab`. The steps to do this are as follows:
+
+1. Ensure `enabled` is set to `true` under the `hosted_files` section in `config.yml`
+2. Put all challenge related files in the `/home/user/skillsHub/challenge` folder.
+
+And thats it. They should automatically move once grading passes for the final phase prior to `mini-lab`.

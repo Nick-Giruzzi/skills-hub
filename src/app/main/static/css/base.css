@@ -20,22 +20,27 @@ legend {
     position: relative;
     border: 1px solid black;
     display: flex;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
 }
 
 .navbar-center {
-    position: absolute;
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: center;
+    /*position: absolute;
     left: 50%;
     transform: translateX(-50%);
     flex-grow: 0;
-    flex-shrink: 0;
+    flex-shrink: 0;*/
 }
 
 .navbar-side {
-    flex-grow: 1;
-    flex-shrink: 1;
+    flex: 1 1 0;
     display: flex;
+    /*flex-grow: 1;
+    flex-shrink: 1;
+    display: flex;*/
 }
 
 .navbar-side.left {
@@ -176,6 +181,10 @@ fieldset {
     color: var(--form-control-color);
 }
 
+input[type='submit'] {
+    font-size: 1.2rem;
+}
+
 input[type='radio'] {
     -webkit-appearance:none;
     appearance: none;
@@ -245,10 +254,10 @@ fieldset.task {
 /* Task upload navbar */
 
 #shop-navbar {
-    width: 300px;
+    width: 290px;
     position: fixed;
     left: 0;
-    top: 15%; /* Start at 15% from the top */
+    top: 16%; /* Start at 15% from the top */
     height: 70%; /* Cover only 70% of the page height */
     background-color: #003f66;
     color: white;
@@ -280,7 +289,8 @@ fieldset.task {
 }
 
 select {
-    width:40%;
+    width:60%;
+    font-size: 1.15rem;
 }
 
 #upForm {

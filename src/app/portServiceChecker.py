@@ -8,7 +8,7 @@ from pythonping import ping
 from app.extensions import logger, globals
 
 
-def checkLocalPorts():
+def checkLocalPorts() -> str:
     '''
     Runs a subprocess to list open TCP and UDP ports
     Returns Stdout from the subprocess
@@ -17,7 +17,7 @@ def checkLocalPorts():
     return stdout
 
 
-def checkLocalPortLoop(interval=30):
+def checkLocalPortLoop(interval: int = 30) -> None:
     '''
     Checks open ports forever in a loop. Default time between checks is 30s. 
     Logs results to the same logger as the rest of the Skills Hub (in one line)
@@ -39,7 +39,7 @@ def checkLocalPortLoop(interval=30):
         sleep(interval)
 
 
-def isIPv4(host):
+def isIPv4(host: str) -> bool:
     '''
     Checks the IP version of a given address
     Returns True if the address is IPv4
@@ -75,7 +75,7 @@ def isIPv4(host):
             return True
 
 
-def isValidIPv4(host):
+def isValidIPv4(host: str) -> bool:
     '''
     A regular expression to check if a given host
     value matches the pattern of an IPv4 address. 
@@ -88,7 +88,7 @@ def isValidIPv4(host):
     return bool(ipv4_re.match(host))
 
 
-def isValidIPv6(host):
+def isValidIPv6(host: str) -> bool:
     '''
     A regular expression to check if a given host 
     value matches the pattern of an IPv6 address. 
@@ -115,7 +115,7 @@ def isValidIPv6(host):
     return bool(ipv6_re.match(host))
 
 
-def checkPing(host, count=1):
+def checkPing(host: str, count: int = 1) -> bool:
     '''
     Checks to see if a host is able to be reached via ping
     Returns True if the host can be pinged
@@ -138,7 +138,7 @@ def checkPing(host, count=1):
         return False
 
 
-def checkSocket(host, port):
+def checkSocket(host: str, port: str|int) -> bool:
     '''
     Checks to see if a remote socket (host/port pair) is reachable
     Returns True if socket connection is successful (port is reachable)
@@ -164,7 +164,7 @@ def checkSocket(host, port):
     return success
 
 
-def checkWeb(host, port=80, path='/'):
+def checkWeb(host: str, port: int|str = 80, path: str = '/') -> bool:
     '''
     Checks connection to a web URL
     Returns True if the web request returns a 200
@@ -184,7 +184,8 @@ def checkWeb(host, port=80, path='/'):
     logger.info(f"Attempting to reach {url}")
     try:
         result = requests.get(url=url)
-        logger.info(f"Web request returned {result.status_code}: {result.content}")
+        logger.info(f"Web request returned {result.status_code}")
+        logger.debug(f"Web request returned {result.status_code}: {result.content}")
         return result.status_code == 200
     except requests.exceptions.Timeout as e:
         logger.error(f"Failed connection to {url}. Connection Timeout Exception: {e}")
@@ -197,7 +198,7 @@ def checkWeb(host, port=80, path='/'):
     return False
 
 
-def checkService(service:dict):
+def checkService(service:dict) -> bool:
     '''
     Checks to see if the service is available once. 
     Returns True is the service is reachable. 
@@ -222,7 +223,7 @@ def checkService(service:dict):
         return False
 
 
-def waitForService(service:dict, interval=2, max_attempts=None):
+def waitForService(service:dict, interval: int = 2, max_attempts: int = 0):
     '''
     Checks the service in a loop until it becomes available or max_attempts is reached. 
     Returns once the service is available or max_attempts is reached.
@@ -243,7 +244,7 @@ def waitForService(service:dict, interval=2, max_attempts=None):
         sleep(interval)
 
 
-def checkServiceLoop(service:dict, interval=30, max_checks=None):
+def checkServiceLoop(service:dict, interval: int = 30, max_checks: int = 0) -> bool:
     '''
     Checks the availability of the service forever in a loop (or until max_checks is reached). Default time between checks is 30s. 
     '''
@@ -259,4 +260,70 @@ def checkServiceLoop(service:dict, interval=30, max_checks=None):
             return True
         sleep(interval)
 
-        
+
+def get_logs(service: dict) -> None:
+    log_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    #host_info = {"host":service['host'],"service":service['service']}
+    while True:
+        sleep(10)
+        # `er` variable is intended to track if a service is 'fve' and then when same logs are grabbed they are logged with `.error` rather than `.info` to make for easier tracking.
+        er = False
+        ## below SSH cmd uses `is-active` option with `systemctl` where the response should be either `actor `inactive` and then Log info accordingly.
+        try:
+            get_status_cmd = f"sshpass -p {service['password']} ssh -o StrictHostKeyChecking=no {service['user']}@{service['host']} 'systemctl is-active {service['service']}'"
+            status_response = subprocess.run(get_status_cmd, shell=True,capture_output=True, timeout=10)
+        except subprocess.TimeoutExpired:
+            logger.error(f"SERVICE_LOGGER: request to host timed out.")
+            globals.services_status[service['service']] = [service['host'],f"request to host timed out. Trying again shortly"]
+            continue
+        except Exception as e:
+            logger.error(f"SERVICE_LOGGER: Exception has occurred when attempting to retrieve service status.")
+            logger.error(f"SERVICE_LOGGER: Exception: {e}")
+            globals.services_status[service['service']] = [service['host'],f"Exception has occurred when attempting to retrieve service status."]
+            continue
+        if status_response.stdout.decode('utf-8') == '':
+            logger.error(f"SERVICE_LOGGER: Error has occurred when attempting to get service status.")
+            logger.error(f"SERVICE_LOGGER: Error: {status_response.stderr.decode('utf-8')}")
+            globals.services_status[service['service']] = [service['host'],f"Error has occurred when attempting to get service status."]
+            continue
+        if status_response.stdout.decode('utf-8').strip('\n') == 'failed':
+            er = "SERVICE FAILED: "
+            logger.error(f"SERVICE_LOGGER: {er} {service['service']} is in failed state.")
+            globals.services_status[service['service']] = [service['host'],f"Service is in failed state."]
+        elif status_response.stdout.decode('utf-8').strip('\n') == 'inactive':
+            er = "SERVICE INACTIVE: "
+            logger.error(f"SERVICE_LOGGER: {er} {service['service']} is in inactive state.")
+            globals.services_status[service['service']] = [service['host'],f"Service is in inactive state."]
+        else:
+            globals.services_status[service['service']] = [service['host'],f"Service is in active state."]
+        ## grab logs
+        try:
+            get_log_cmd = f"sshpass -p {service['password']} ssh -o StrictHostKeyChecking=no {service['user']}@{service['host']} 'journalctl --since \"{log_time}\" -u {service['service']}'"
+            log_response = subprocess.run(get_log_cmd, shell=True,capture_output=True,timeout=10)
+            cur_logs = log_response.stdout.decode('utf-8')
+        except subprocess.TimeoutExpired:
+            logger.error(f"SERVICE_LOGGER: SSH connection to host timed out.")
+            continue
+        except Exception as e:
+            logger.error(f"SERVICE_LOGGER: Exception has occurred when attempting to retrieve logs.")
+            logger.error(f"SERVICE_LOGGER: Exception: {e}")
+            continue
+        if log_response.stdout.decode('utf-8') == '':
+            logger.error(f"SERVICE_LOGGER: Error has occurred when attempting to collect logs.")
+            logger.error(f"SERVICE_LOGGER: Error: {log_response.stderr.decode('utf-8')}")
+            continue
+        if "No entries" in cur_logs:
+            if er != False:
+                logger.error(f"SERVICE_LOGGER: {er} No new logs fe.")
+            else:
+                logger.info(f"SERVICE_LOGGER: No new logs found at this time.")
+            continue
+        output = cur_logs.split("\n")
+        output.remove("")
+        for line in output:
+            if er == False:
+                logger.info(f"SERVICE_LOGGER: {line}")
+            else:
+                logger.error("SERVICE_LOGGER: "+ er + line)
+        log_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+

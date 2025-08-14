@@ -4,8 +4,10 @@ import subprocess, io, datetime, random, string, copy, os, secrets
 from flask import Blueprint, render_template, request, Response, current_app, redirect, url_for, abort, send_from_directory, jsonify, flash, g
 from werkzeug.utils import secure_filename
 # local imports
-from app.extensions import logger, globals,db
-from app.functions import do_grade, check_questions,read_token
+from app.extensions import logger, globals, db
+#from app.functions import do_grade, check_questions,read_token
+from app.grading import read_token, do_grade
+from app.databaseHelpers import check_questions
 from app.models import QuestionTracking
 
 main = Blueprint("main",__name__, template_folder=f'templates', static_folder=f'static')     # add path to templates/static if error
@@ -55,7 +57,7 @@ def grade():
         return redirect(url_for('main.results'))
 
     if not globals.server_ready:
-        logger.info("Tried to perform grading before server was marked as ready.")
+        logger.debug("Tried to perform grading before server was marked as ready.")
         return redirect(url_for("info.main"))
 
     # if there is no current grading task, then create one
@@ -90,16 +92,20 @@ def grade():
         # globals.results, globals.tokens = task.result()
         globals.task = None
         #if globals.submission_method == 'display':
-        logger.info(f"Rendering graded results html page for user. Fatal error is {globals.fatal_error}")
+        logger.debug(f"Rendering graded results html page for user. Fatal error is {globals.fatal_error}")
         return redirect(url_for('main.results'))
         #else:
         #    return render_template("auto_submit.html", submit_time=globals.manual_submit_time)
     
     # if the current grading task is still running, show the grading page with the last submit time
     if globals.task.running():
-        logger.info("Grading task is still running")
+        logger.debug("Grading task is still running")
         return render_template('grading.html', submit_time=globals.manual_submit_time)
 
+@main.route('/accessiblity', methods=['GET'])
+def change_mode():
+    globals.accessible_enabled = not globals.accessible_enabled
+    return redirect(request.referrer)
 
 @main.route('/results',methods=['GET'])
 def results():
@@ -186,11 +192,9 @@ def list_files(folder):
         dirs = {}
         # Directly join the folder path with the base directory
         tmpDir = os.path.join(globals.hosted_file_directory, folder)
-        #logger.info(f"-----tmp---{tmpDir}---")
         for filename in os.listdir(tmpDir):
             path = os.path.join(tmpDir,filename)
             if os.path.isdir(path):
-                #logger.info(f"--------{path}---{folder}---{filename}")
                 dirs[filename] = os.path.join(folder,filename)
             elif os.path.isfile(path):
                 files[filename] = os.path.join(folder,filename)
@@ -208,10 +212,10 @@ def get_file(path):
             return redirect(url_for('main.list_files'))
         filePath = os.path.join(globals.hosted_file_directory, path)
         if not globals.server_ready:
-            logger.info("Tried to download files before server was marked as ready.")
+            logger.debug("Tried to download files before server was marked as ready.")
             return redirect(url_for("main.home"))
         if os.path.isfile(filePath) :
-            logger.info(f"User is downloading file {filePath}")
+            logger.debug(f"User is downloading file {filePath}")
             return send_from_directory(globals.hosted_file_directory,path,as_attachment=True)
         else:
             flash("That file does not exist.")
@@ -229,12 +233,11 @@ def upload():
     if cur_file.filename in globals.filelist:
         cur_file.filename += '_'
         cur_file.filename += ''.join([secrets.choice(string.ascii_letters) for _ in range(10)])
-        #cur_file.filename += [secrets.choice(string.ascii_letters) for _ in range(10)]
     if cur_file:
         fn = secure_filename(cur_file.filename)
-        cur_file.save(os.path.join(globals.upload_folder, fn))
+        cur_file.save(os.path.join(globals.uploaded_file_directory, fn))
         cur_file.close()
-        globals.filelist = os.listdir(f"{globals.basedir}/uploaded_files")
+        globals.filelist = os.listdir(globals.uploaded_file_directory)
         return jsonify({"msg":"Success: File Uploaded"})
     return jsonify({"msg":"Error: No File found"})
 

@@ -1,11 +1,10 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 import os, sys
-from flask import Flask, session
 # local import
 from app.extensions import globals
 
-class Config:
+class FlaskConfig:
     SECRET_KEY = 'NOT_A_TOKEN'
     SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(globals.basedir,'hub.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False

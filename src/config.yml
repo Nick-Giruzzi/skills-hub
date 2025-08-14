@@ -1,5 +1,5 @@
 # Please read the `config_README.md` file to get detailed explanation of available configurations.
-lab_name: ""
+lab_name: "Introduction to SCADA using Modbus and BACnet"
 
 app:
   host: "0.0.0.0"
@@ -7,11 +7,12 @@ app:
 
 startup:
   # Set this to false if you don't want your startup scripts to run in a workspace (only in a gamespace)
-  runInWorkspace: true
+  enabled: true
+  runInWorkspace: false
   scripts: 
-    - startup.py
+    - startupScript.sh
 
-# required_services:
+required_services:
   ## Example: Ensure you can ping this host before startup scripts kick off
   # - host: example.us
   #   type: ping
@@ -37,7 +38,7 @@ hosted_files:
 info_and_services:
   info_home_enabled: false
   services_home_enabled: false
-  bookmarks_enabled: true
+  bookmarks_enabled: false
   bookmarks:
     mail: "https://box.skills.hub/"
     firewall: "https://pfsense.skills.hub/"
@@ -66,34 +67,35 @@ grading:
   cron_delay: 10
   cron_limit: null
   rate_limit: 0
-  token_location: static
+  token_location: guestinfo
   tokens:
-    GradingCheck1: "abcdefg"
-    GradingCheck2: "1234567"
-    GradingCheck3: "a1b2c3d"
+    GradingCheck1: "token1"
+    GradingCheck2: "token2"
+    GradingCheck3: "token3"
 
   submission: 
     method: display
     grader_url: "https://presidentscup.cisa.gov/gb/pc/"
     grader_key: "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
+  # Example format of available grading types in `config_README.md`
   parts:
-    GradingCheck1:    
-      token_name: Q1  
-      text: "What is the correct choice?"
+    GradingCheck1:
+      token_name: Q1
+      text: "Example question text?"
+      mode: text
+    GradingCheck2:
+      token_name: Q2
+      text: "Click button for grading."
+      mode: button
+    GradingCheck3:
+      name: Q3
+      text: "What option do you choose?"
       mode: mc
       opts:
         a: "answer1"
-        b: "correct answer"
+        b: "answer2"
         c: "answer3"
-    GradingCheck2: 
-      token_name: Q2
-      text: "This is example question 2"
-      mode: upload
-    GradingCheck3:  
-      token_name: Q3
-      text: "This is the 3rd example question"
-      mode: button
 
 
   phases: true
@@ -102,4 +104,3 @@ grading:
     phase2: ["GradingCheck2"]
     phase3: ["GradingCheck3"]
     #mini_lab: []
-

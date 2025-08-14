@@ -1,102 +1,348 @@
 #!/usr/bin/env python3
 
-import subprocess, os, logging
+import subprocess, os, logging, yaml, socket, sys
 from flask_apscheduler import APScheduler
 from datetime import timedelta, time
-# from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
+from typing import Optional, List, Dict, Set, Union
+from app.extensions import logger
 
 class Globals():
-    def __init__(self):
-        # App Config
-        self.app_host = None
-        self.app_port = None
+    def __init__(self) -> None:
+        # Static defaults (non-configurable)
+        self.VALID_CONFIG_MODES: List[str] = ['button', 'cron', 'text', 'text_single', 'mc', 'upload']
+        self.MANUAL_MODE: List[str] = ['button', 'text', 'text_single', 'mc', 'upload']
+        self.VALID_TOKEN_LOCATIONS: List[str] = ['guestinfo', 'static']
+        self.VALID_SUBMISSION_METHODS: List[str] = ['display', 'grader_post']
+        self.VALID_SERVICE_TYPES: List[str] = ['ping', 'socket', 'web']
 
-        # Information from config.yml
-        self.VALID_CONFIG_MODES = ['button', 'cron', 'text', 'text_single', 'mc', 'upload']
-        self.MANUAL_MODE = ['button', 'text', 'text_single', 'mc', 'upload']
-        self.VALID_TOKEN_LOCATIONS = ['guestinfo', 'static']
-        self.VALID_SUBMISSION_METHODS = ['display', 'grader_post']
-        self.VALID_SERVICE_TYPES = ['ping', 'socket', 'web']
+        # Directories
+        self.basedir: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.custom_script_dir: str = f"{self.basedir}/custom_scripts"
+        self.hosted_file_directory: str = f"{self.basedir}/hosted_files"
+        self.uploaded_file_directory: str = f"{self.basedir}/uploaded_files"
+        self.yaml_path: str = f"{self.basedir}/config.yml"
+        self.ssl_dir: str = f"{self.basedir}/app/ssl"
+        self.challenge_files: str = f"{self.basedir}/challenge_files"
 
-        # important directories and files
-        self.basedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.custom_script_dir = f"{self.basedir}/custom_scripts"
-        self.hosted_file_directory = f"{self.basedir}/hosted_files"
-        self.upload_folder = f"{self.basedir}/uploaded_files"
-        self.yaml_path =  f"{self.basedir}/config.yml"
-        self.ssl_dir = f"{self.basedir}/app/ssl"
+        # Initialize overridable vars
+        self.app_host: str = "0.0.0.0"
+        self.app_port: int = 8888
+        #self.app_cert: Optional[str] = None
+        #self.app_key: Optional[str] = None
+        self.lab_name: str = ""
+        #self.port_checker: bool = False
+        self.grading_enabled: bool = False
+        self.hosted_files_enabled: bool = False
+        self.info_home_enabled: bool = False
+        self.services_home_enabled: bool = False
+        self.accessible_enabled: bool = False
 
-        # configuration globals
-        challenge_id = subprocess.run(f"vmtoolsd --cmd 'info-get guestinfo.isolationTag'", shell=True, capture_output=True).stdout.decode('utf-8').strip().replace("-", "")
-        self.challenge_id = challenge_id
-        self.startup_workspace = False
-        self.startup_scripts = None
-        self.required_services = []
-        self.blocking_services = []
-        self.blocking_threadpool = None
-        self.grading_enabled = None
-        self.hosted_files_enabled = None
-        self.grading_mode = list()
-        self.manual_grading_script = None
-        self.cron_grading_script = None
-        self.grading_rateLimit = timedelta(seconds=0)
-        self.grading_parts = None
-        self.question_order = list()
-        self.token_location = None
-        self.submission_method = None
-        self.grader_post = False
-        self.services_list= None
-        self.services_status = dict()
-        self.q_modes = set()
-        self.question_order = []
-        self.lab_completed = False
-        self.lab_completion_time = ""
-        self.info_home_enabled = False
-        self.services_home_enabled = False
-        self.bookmarks = None
-        self.filelist = os.listdir(f"{self.basedir}/uploaded_files")
+        # Configuration globals
+        self.conf: dict = {}
+        self.lab_id: str = subprocess.run(f"vmtoolsd --cmd 'info-get guestinfo.isolationTag'", shell=True, capture_output=True).stdout.decode('utf-8').strip().replace("-", "")
+        self.support_code: str = self.lab_id[:8]
+        self.variant_index: int = self._init_variant_index()
+        self.lab_code: str = self._init_lab_code()
+        self.in_workspace: bool = "workspace" in self.lab_code
 
-        # gameboad submission globals
-        self.grader_url = ""
-        self.grader_key = ""
+        self.startup_enabled:bool = False
+        self.startup_workspace: bool = False
+        self.startup_scripts: List[str] = []
+        self.required_services: List[dict] = []
+        self.blocking_services: List[dict] = []
+        self.blocking_threadpool = ThreadPoolExecutor(thread_name_prefix="BlockingServices")
 
-        # cron specific globals
-        self.cron_limit = None
-        self.cron_interval = None
-        self.cron_delay = None
-        self.cron_at = None
-        self.cron_type = None
+        self.grading_mode: List[str] = []
+        self.manual_grading_script: Optional[str] = None
+        self.cron_grading_script: Optional[str] = None
+        self.grading_rateLimit: timedelta = timedelta(seconds=0)
+        self.grading_parts: Optional[dict] = None
+        self.question_order: List[str] = []
+        self.token_location: str = "guestinfo"
+        self.submission_method: str = "display"
+        self.grader_post: bool = False
+        self.services_list: Optional[List[dict]] = None
+        self.services_status: Dict[str, List[str]] = {}
+        self.q_modes: Set[str] = set()
+        self.lab_completed: bool = False
+        self.lab_completion_time: str = ""
+        self.grader_url: Optional[str] = ""
+        self.grader_key: Optional[str] = ""
 
-        # submission/grading runtime globals
-        self.manual_submit_time = time().strftime("%m/%d/%Y %H:%M:%S")
-        self.cron_submit_time = time().strftime("%m/%d/%Y %H:%M:%S")
-        self.manual_results = None
-        self.cron_results = None
-        self.tokens = {
-            "manual":dict(),
-            "cron":dict()
-            }
-        self.static_tokens = dict()
-        self.grading_verb = "POST"
-        self.phases_enabled = False
-        self.phases = None
-        self.phase_order = []
-        self.current_phase = None
+        self.bookmarks: Optional[dict] = None
+        self.filelist: list = os.listdir(f"{self.basedir}/uploaded_files")
 
-        # other
-        self.support_code = challenge_id[:8]
-        variant_index = subprocess.run(f"vmtoolsd --cmd 'info-get guestinfo.variant'", shell=True, capture_output=True).stdout.decode('utf-8').strip()
-        variant_index = "-1" if not variant_index or "##" in variant_index or len(variant_index) > 2 else str(int(variant_index) + 1)
-        self.variant_index = variant_index
-        challenge_code = subprocess.run(f"vmtoolsd --cmd 'info-get guestinfo.code'", shell=True, capture_output=True).stdout.decode('utf-8').strip()
-        challenge_code = "workspace" if not challenge_code or "##" in challenge_code else challenge_code
-        self.challenge_code = challenge_code
-        self.fatal_error = False
-        self.in_workspace = True if "workspace" in challenge_code else False
+        # Cron
+        self.cron_limit: Optional[int] = None
+        self.cron_interval: Optional[int] = None
+        self.cron_delay: Optional[int] = None
+        self.cron_at: Optional[str] = None
+        self.cron_type: Optional[str] = None
 
-        # track current status of server
-        self.task = None
-        self.server_ready = False
+        # Runtime values
+        now = time().strftime("%m/%d/%Y %H:%M:%S")
+        self.manual_submit_time: str = now
+        self.cron_submit_time: str = now
+        self.manual_results: Optional[dict] = None
+        self.cron_results: Optional[dict] = None
+        self.tokens: Dict[str, Dict] = { "manual": {}, "cron": {} }
+        self.static_tokens: Optional[dict] = None
+        self.grading_verb: str = "POST"
+
+        # Phases
+        self.phases_enabled: bool = False
+        self.phases: Optional[dict] = None
+        self.phase_order: List[str] = []
+        self.current_phase: Optional[str] = None
+
+        # Server state
+        self.fatal_error: bool = False
+        self.task: Optional[str] = None
+        self.server_ready: bool = False
         self.executor = None
-        self.scheduler = APScheduler()
-        self.lab_name = ""
+        self.scheduler: APScheduler = APScheduler()
+
+    def __repr__(self) -> str:
+        """
+        Return a string representation of the object.
+
+        Returns:
+            str: String with each attribute/value listed on a new line
+        """
+
+        attrs = vars(self)
+        lines = [f"{k}={v!r}" for k, v in sorted(attrs.items())]
+        return f"<Globals:\n  " + "\n  ".join(lines) + "\n>"
+
+
+    def _init_variant_index(self) -> int:
+        """
+        Return the variant index if it exists in env var. Default to -1.
+
+        Returns:
+            int: The variant index
+        """
+        variant = subprocess.run(f"vmtoolsd --cmd 'info-get guestinfo.variant'", shell=True, capture_output=True).stdout.decode('utf-8').strip()
+        #variant = get_clean_env('CS_VARIANT')
+        if variant and "##" not in variant and len(variant) <= 2:
+            return int(variant)
+        return -1
+
+
+    def _init_lab_code(self) -> str:
+        """
+        Return the lab code if it exists in env var. Default to 'workspace'.
+
+        Returns:
+            str: The lab Code. Default is 'workspace'.
+        """
+
+        #code = get_clean_env('CS_CODE', '')
+        code = subprocess.run(f"vmtoolsd --cmd 'info-get guestinfo.code'", shell=True, capture_output=True).stdout.decode('utf-8').strip()
+        return "workspace" if not code or "##" in code else code
+
+
+    def resolve(self, conf: dict, default: str = '') -> str:
+        """
+        Resolves a configuration value.
+        Read from env var first. Then fallback to the configuration dictionary.
+        If value does not exist in env var or config, use the provided default.
+
+        Args:
+            key (str): Config to lookup
+            conf (dict): Configuration dictionary value.
+            default (str, optional): Default value. Defaults to ''.
+
+        Returns:
+            str: The configuration value.
+        """
+        return conf or default
+
+
+    def resolve_bool(self, conf: Union[dict, bool], default: bool = False) -> bool:
+        """
+        Resolves a configuration boolean value.
+        Read from env var first. Then fallback to the configuration dictionary.
+        If value does not exist in env var or config, use the provided default.
+
+        Args:
+            key (str): Config to lookup
+            conf (dict): Configuration dictionary value.
+            default (str, optional): Default value. Defaults to ''.
+
+        Returns:
+            bool: The configuration value.
+        """
+        if isinstance(conf, dict):
+            return conf.get('enabled', default)
+        return conf or default
+
+
+    def resolve_int(self, conf_val, default: int) -> int:
+        """
+        Resolves a configuration int value.
+        Read from env var first. Then fallback to the configuration dictionary.
+        If value does not exist in env var or config, use the provided default.
+
+        Args:
+            key (str): Config to lookup
+            conf (dict): Configuration dictionary value.
+            default (str, optional): Default value. Defaults to ''.
+
+        Returns:
+            int: The configuration value.
+        """
+
+        if isinstance(conf_val, int):
+            return conf_val
+        return default
+
+    def resolve_ip(self, conf_val, default: str) -> str:
+        """
+        Resolves a configuration IP address value by ensuring it is a valid IP address.
+        Read from env var first. Then fallback to the configuration dictionary.
+        If value does not exist in env var or config, use the provided default.
+
+        Args:
+            key (str): Config to lookup
+            conf (dict): Configuration dictionary value.
+            default (str, optional): Default value. Defaults to ''.
+
+        Returns:
+            bool: The configuration value.
+        """
+        try:
+            socket.gethostbyname(conf_val)
+            return conf_val
+        except (socket.gaierror, TypeError):
+            logging.warning(f"Invalid IP or hostname '{conf_val}', defaulting to '{default}'")
+            return default
+
+
+    def resolve_port(self, conf_val, default: int) -> int:
+        """
+        Resolves a configuration TCP port value by ensuring it is a valid TCP port.
+        Read from env var first. Then fallback to the configuration dictionary.
+        If value does not exist in env var or config, use the provided default.
+
+        Args:
+            key (str): Config to lookup
+            conf (dict): Configuration dictionary value.
+            default (str, optional): Default value. Defaults to ''.
+
+        Returns:
+            bool: The configuration value.
+        """
+
+        if isinstance(conf_val, int) and 1 <= conf_val <= 65535:
+            return conf_val
+        logging.warning(f"Invalid port '{conf_val}', defaulting to {default}")
+        return default
+
+
+    def load_config(self, conf: dict):
+        logging.info("Loading application config")
+        self.conf = conf
+        self.app_host = self.resolve_ip(conf.get('app', {}).get('host'), '0.0.0.0')
+        self.app_port = self.resolve_port(conf.get('app', {}).get('port'), 8888)
+        self.startup_scripts = conf.get('startup', {}).get('scripts',[])
+        self.startup_enabled = conf.get('startup', {}).get('enabled',False)
+        self.startup_workspace = conf.get('startup', {}).get('runInWorkspace',False)
+        #self.app_cert = self.resolve(conf.get('app', {}).get('tls_cert'))
+        #self.app_key = self.resolve(conf.get('app', {}).get('tls_key'))
+        self.lab_name = self.resolve(conf.get('lab_name'), "")
+        self.port_checker = self.resolve_bool(conf.get('port_checker'), False)
+        self.grading_enabled = self.resolve_bool(conf.get('grading').get('enabled'), False)
+        if (self.grading_enabled) and (conf.get('grading').get('manual_grading', False)):
+            self.manual_grading_script = self.resolve(conf.get('grading').get('manual_grading_script'))
+            self.grading_mode.append('manual')
+        if (self.grading_enabled) and (conf.get('grading').get('cron_grading', False)):
+            self.cron_grading_script = self.resolve(conf.get('grading').get('cron_grading_script'))
+            self.grading('cron')
+        self.hosted_files_enabled = self.resolve_bool(conf.get('hosted_files').get('enabled'), False)
+        self.info_home_enabled = self.resolve_bool(conf.get('info_and_services'), False)
+        self.services_home_enabled = self.resolve_bool(conf.get('info_and_services'), False)
+        if self.resolve_bool(conf.get('info_and_services').get('bookmarks_enabled'),False):
+            self.bookmarks = conf.get('info_and_services').get('bookmarks')
+        #self.cmi5_enabled = self.resolve_bool('CS_CMI5_ENABLED', conf.get('cmi5'), False)
+        self.grading_parts = conf['grading']['parts']
+        if 'manual' in self.grading_mode:
+            try:
+                if not os.access(os.path.join(self.custom_script_dir,self.manual_grading_script), os.X_OK):
+                    logging.error(f"Manual grading script {self.manual_grading_script} is not executable.")
+                    exit(1)
+            except Exception as e:
+                logging.error(f"Got exception {e} while checking if manual grading script {self.manual_grading_script} is executable.")
+                exit(1)
+        if 'cron' in self.grading_mode:
+            try:
+                if not os.access(os.path.join(self.custom_script_dir,self.cron_grading_script), os.X_OK):
+                    logging.error(f"Cron grading script {self.cron_grading_script} is not executable.")
+                    exit(1)
+            except Exception as e:
+                logging.error(f"Got exception {e} while checking if cron grading script {self.cron_grading_script} is executable.")
+                exit(1)
+        self.required_services = conf.get('required_services', [])
+        if self.required_services == []:
+            logger.info("No required services configured.")
+        else:
+            for service in self.required_services:
+                # ensure host is defined in required services
+                if 'host' not in service:
+                    logger.error(f"Missing host definition in required service: {service}")
+                    exit(1)
+                # ensure type is defined in required services. If default to ping type. 
+                if 'type' not in service:
+                    logger.info(f"Missing type definition in required service: {service}. Defaulting to ping.")
+                    service['type'] = "ping"
+                # ensure defined type is valid
+                if service['type'] not in self.VALID_SERVICE_TYPES:
+                    logger.error(f"Invalid required service type in: {service}. Valid types are {self.VALID_SERVICE_TYPES}.")
+                    exit(1)
+                # ensure port is defined for socket type
+                if service['type'] == 'socket' and 'port' not in service:
+                    logger.error(f"Missing port definition in required service: {service}. Port definition is required with socket type")
+                    exit(1)
+                # ensure web options are set/defaulted
+                if service['type'] == 'web':
+                    if 'port' not in service:
+                        logger.info(f"Missing web port definition in required service: {service}. Defaulting to 80")
+                        service['port'] = 80
+                    if 'path' not in service:
+                        logger.info(f"Missing web path definition in required service: {service}. Defaulting to /")
+                        service['path'] = '/'
+                # ensure block startup scripts is defined. Default to False if not
+                if 'block_startup_scripts' not in service:
+                    logger.info(f"Missing block startup script definition in service: {service}. Defaulting to False")
+                    service['block_startup_scripts'] = False
+                if not isinstance(service['block_startup_scripts'], bool):
+                    logger.error(f"Invalid type for block_startup_scripts. Must be true/false")
+                    exit(1)
+                # add to blocking services if needed
+                if service['block_startup_scripts']:
+                    self.blocking_services.append(service)
+        logging.debug(f"Final Config: {self}")
+
+
+    @classmethod
+    def from_yaml(cls, instance: Optional["Globals"] = None) -> "Globals":
+        instance = instance or cls()
+        if not os.path.isfile(instance.yaml_path):
+            print("Could not find config.yml file.")
+            sys.exit(1)
+
+        with open(instance.yaml_path, 'r') as config_file:
+            try:
+                conf = yaml.safe_load(config_file)
+            except yaml.YAMLError:
+                print("Error Reading YAML in config file")
+                sys.exit(1)
+
+        instance.load_config(conf or {})
+        return instance
+
+    def mv_challenge_files(self):
+        if (self.hosted_files_enabled) and (len(os.listdir(self.challenge_files)) != 0):
+            if 'challenge' not in os.listdir(self.hosted_file_directory):
+                os.system(f'cp -r {self.challenge_files} {self.hosted_file_directory}')

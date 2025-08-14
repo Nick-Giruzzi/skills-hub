@@ -5,13 +5,14 @@ from flask import Flask, url_for, redirect, flash, request
 from apscheduler.events import EVENT_ALL, EVENT_JOB_MODIFIED ,EVENT_ALL_JOBS_REMOVED, EVENT_JOB_ERROR, EVENT_JOB_REMOVED, EVENT_SCHEDULER_PAUSED, EVENT_SCHEDULER_SHUTDOWN
 
 #local imports
-from config import Config
-from app.functions import set_cron_vars, run_cron_thread, record_solves
+from flaskConfig import FlaskConfig
+from app.cron import run_cron_thread
+#from app.functions import set_cron_vars, run_cron_thread, record_solves
 from app.extensions import globals, logger, db
 from app.models import QuestionTracking, PhaseTracking, EventTracker
 
 
-def create_app(config_class=Config):
+def create_app(config_class: FlaskConfig = FlaskConfig) -> Flask:
     app = Flask(__name__, instance_relative_config=False)
     app.config.from_object(config_class) 
     app.url_map.strict_slashes = False
@@ -84,16 +85,20 @@ def create_app(config_class=Config):
 def run_startup_scripts():
     successes = {}
     errors = {}
-    if not globals.startup_scripts:
-        logger.info("There are no startup scripts to run")
+    if not globals.startup_enabled:
+        logger.info("Startup Scripts are disabled.")
         return successes, errors
-    
+
     if not globals.startup_workspace and globals.in_workspace:
         logger.info("Startup scripts are disabled when running in a workspace. Skipping startup scripts")
         return successes, errors
 
+    if (globals.startup_scripts == []) or (globals.startup_scripts == [None]) or (globals.startup_scripts == None):
+        logger.info("There are no startup scripts configured to run")
+        return successes, errors
+
     for startup_script in globals.startup_scripts:
-        logger.info(f"Calling {startup_script}")
+        logger.debug(f"Calling {startup_script}")
     
         # run the startup script and parse output into a dict
         ## The output variable has properties output.stdout  and  output.stderr

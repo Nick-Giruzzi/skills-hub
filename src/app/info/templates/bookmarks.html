@@ -13,7 +13,7 @@
 
 <div class="welcome-message">
     <form>
-        <fieldset style="width:30%;">
+        <fieldset class="bookmark_fieldset">
             <table class="res-table">
                 <thead class="res-thead">
                     <th class="home_table_page">Resource</th>
@@ -22,7 +22,7 @@
                 {% for k,v in g.globs.bookmarks.items() %}
                     <tr>
                         <td class="home_table_page">{{k.capitalize()}}</td>
-                        <td class="home_table_func"><a class="book" href="{{v}}">{{v}}</a></td>
+                        <td class="home_table_func"><a class="book" href="{{v}}" target="_blank">{{v}}</a></td>
                     </tr>
                 {% endfor %}
             </table>
@@ -30,6 +30,4 @@
     </form>
 </div>
 
-
 {% endblock %}
-

@@ -1,0 +1,361 @@
+body {
+    background: white;
+    font-family: "Franklin Gothic", sans-serif;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-size: 2rem;
+}
+
+legend {
+    padding: 5px 10px;
+    border: 1px solid black;
+    font-size: 2.5rem;
+    font-weight: bold;
+}
+
+.navbar {
+    overflow: hidden;
+    background-color: #005288;
+    position: relative;
+    border: 1px solid black;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.navbar-center {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: center;
+    /*position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    flex-grow: 0;
+    flex-shrink: 0;*/
+}
+
+.navbar-side {
+    flex: 1 1 0;
+    display: flex;
+    /*flex-grow: 1;
+    flex-shrink: 1;
+    display: flex;*/
+}
+
+.navbar-side.left {
+    justify-content: flex-start;
+}
+
+.navbar-side.right {
+    justify-content: flex-end;
+}
+
+ul.navbarul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+}
+
+li.navfloat {
+    float: none;
+}
+
+.navbar_elements {
+    display: block;
+    color: white;
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+}
+
+a.navbar_elements:hover {
+    cursor: pointer;
+    background-color: #7AA5C1;  
+    color: #000000;  
+}
+
+/* Fix footer positioning to prevent overlap */
+footer {
+    position: relative;  
+    text-align: center;
+    margin-top: 40px;
+    padding: 20px;
+    width: 100%;
+    left: 0;  
+}
+
+/* Welcome + Table Area */
+fieldset {
+    width: 80%;
+    border: 1px solid black;
+    background-color: #005288;
+    color: white;
+    margin: auto;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.welcome-message {
+    margin: 10px auto 5px auto;
+    text-align: center;
+    color: #002844;
+}
+
+.welcome-message h1 {
+    font-size: 3rem;
+    font-weight: bold;
+    text-decoration: underline;
+    margin: 0;
+    margin-bottom: 5px;
+    padding: 0;
+    color: #003f66;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.page_name h2 {
+    font-size: 26px;
+    font-weight: bold;
+    margin: 30px 0;
+    padding: 0;
+    color: #003f66;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.table-container {
+    overflow-x: auto;
+    margin: 0 auto;
+    width: 100%;
+    max-width: 1000px;
+}
+
+/* Table Styling */
+.res-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #005288;
+    color: white;
+    font-size: 2.5rem;
+    table-layout: fixed;
+}
+
+.res-table th,
+.res-table td {
+    text-align: center;
+    padding: 12px 16px;
+    border: 1px solid #003f66;
+    word-wrap: break-word;
+}
+
+.res-table thead {
+    background-color: #002844;
+    font-size: 2.5rem;
+    font-weight: bold;
+}
+
+.res-table tr:nth-child(even) {
+    background-color: #0463a7;
+}
+
+.res-table tr:hover {
+    background-color: #0078c1;
+    cursor: default;
+}
+
+.form-control {
+    text-align: left;
+    margin-left: 50px;
+    font-size: 1.05em;
+    font-family: inherit;        /*system-ui, sans-serif;*/
+    /*font-weight: bold;*/
+    line-height: 1.1;
+    display: grid;
+    grid-template-columns: 1.5em auto;
+    gap: 2em;
+}
+
+.form-control + .form-control {
+    margin-top: 1em;
+}
+
+.form-control:focus-within {
+    color: var(--form-control-color);
+}
+
+input[type='submit'] {
+    font-size: 2.4rem;
+}
+
+input[type='radio'] {
+    -webkit-appearance:none;
+    appearance: none;
+    background-color: var(--form-background);
+    margin: 0;
+
+    font: inherit;
+    color: currentColor;
+
+    height: 1.3em;
+    width: 1.3em;
+    min-height: 44px;
+    min-width: 44px;
+    border: 0.15em solid currentcolor;
+    border-radius: 50%;
+    transform: translateY(-0.075em);
+
+    display:grid;
+    place-content:center;
+}
+
+input[type='radio']::before {
+  content:'';
+  width:0.65em;
+  height:0.65em;
+  border-radius:50%;
+  transform: scale(0);
+  transition:120ms transform ease-in-out;
+  box-shadow:inset 1em 1em var(--form-control-color);
+
+  background-color:CanvasText;
+}
+
+input[type='radio']:checked::before {
+  transform:scale(1);
+}
+
+input[type='radio']:focus {
+  outline:max(2px, 0.15em) solid currentColor;
+  outline-offset:max(2px, 0.15em);
+}
+
+.txt_format {
+    padding:30px;
+    font-weight: bold;
+}
+
+a.book:link {
+    color: white;
+    background-color: transparent;
+    text-decoration: none;
+}
+
+a.book:visited {
+    color: white;
+    background-color: transparent;
+    text-decoration: none;
+}
+
+a.book:hover {
+    color: #191923;
+    background-color: transparent;
+    text-decoration: underline;
+}
+
+fieldset.task {
+    width: 65%;
+}
+
+/* Task upload navbar */
+
+#shop-navbar {
+    width: 290px;
+    position: fixed;
+    left: 0;
+    top: 21.7%; /* Start at 15% fr  height: 70%; /* Cover only 70% of the page height */
+    height: 70%;
+    background-color: #003f66;
+    color: white;
+    padding: 10px;
+    overflow-x: hidden;
+    overflow-y: auto; /* Enable scroll if content is more */
+}
+
+.sticky {
+    position: fixed;
+    top: 15%;
+}
+
+#shop-navbar ul{
+    list-style-type: none;
+    padding: 0;
+}
+
+#shop-navbar li {
+    padding: 8px;
+    margin-bottom: 10px;
+    background-color: #005288;
+    cursor: pointer;
+}
+
+.text {
+    font-size:16px;
+    padding: 10px 0
+}
+
+select {
+    width:70%;
+    font-size:2.3rem;
+}
+
+#upForm {
+    padding: 5px 0;
+}
+
+.home_table_page {
+    width:30%;
+}
+
+.home_table_func {
+    width:70%;
+}
+
+.bookmark_fieldset {
+    width:50%;
+}
+
+/* Add visible focus indicators for all interactive elements */
+a:focus,
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+    outline: 3px solid #0078FF;
+    outline-offset: 2px;
+}
+
+/* Specific focus style for navbar links */
+.navbar_elements:focus {
+    outline: 3px solid #FFFFFF;
+    outline-offset: -3px;
+}
+
+/* Add focus styles for form controls */
+.form-control:focus-within {
+    outline: 3px solid #0078FF;
+    outline-offset: 2px;
+}
+
+/* Respect user preferences for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    input[type='radio']::before {
+        transition: none;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .navbar {
+        border: 2px solid;
+    }
+    
+    fieldset {
+        border: 2px solid;
+    }
+    
+    .res-table th,
+    .res-table td {
+        border: 2px solid;
+    }
+}
