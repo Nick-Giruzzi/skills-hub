@@ -1,5 +1,5 @@
 # Please read the `config_README.md` file to get detailed explanation of available configurations.
-lab_name: "Introduction to SCADA using Modbus and BACnet"
+lab_name: ""
 
 app:
   host: "0.0.0.0"
