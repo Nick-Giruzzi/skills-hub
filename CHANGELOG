@@ -1,5 +1,9 @@
 Skills Hub Changelog
 
+8/28/2025
+- Added 'Settings' page, moved "Accessibility" page to it as well as restart functionality and generating user report
+    - Files affected: settings.js, settings.html, info.py, accessible.css, base.css, base.html, main.py
+
 8/21/2025
 - Updated logic used for dynamically loading grading results by implementing Flask Server Side Events (SSE).
     - Files affected: results.js, main.py
