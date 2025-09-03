@@ -1,11 +1,12 @@
 #!/usr/bin/python3
 
-import subprocess, logging, re, socket, requests, ipaddress
+import subprocess, logging, re, socket, requests, ipaddress, os, sys
+from flask import Flask
 from datetime import datetime
 from time import sleep
 from pythonping import ping
 # local imports
-from app.extensions import logger, globals
+from app.extensions import globals
 
 
 def checkLocalPorts() -> str:
@@ -24,12 +25,12 @@ def checkLocalPortLoop(interval: int = 30) -> None:
     Logs in a more readable format written to /var/log/open-ports
     '''
 
-    logger.info(f"Checking local open ports every {interval} seconds")
+    globals.app.logger.info(f"Checking local open ports every {interval} seconds")
     while True:
         date = datetime.now().strftime("%d/%m/%Y-%H:%M:%S")
         open_ports = checkLocalPorts()
         stripped = re.sub("\s+", " ", open_ports).replace("\n", "\\n") # removing multiple spaces in a row and newline chars make this nicer for syslog (one line logging)
-        logger.info(f"Open ports: {stripped}")
+        globals.app.logger.info(f"SERVICE/PORT LOGS: Open ports: {stripped}")
 
         with open("/var/log/open-ports", "a") as f:
             f.write(f"""
@@ -48,30 +49,30 @@ def isIPv4(host: str) -> bool:
     If unsuccessful, assumes address is IPv6 
     '''
     if isValidIPv4(host):
-        logger.info(f"Regex matched {host} as a valid IPv4 address")
+        globals.app.logger.info(f"SERVICE/PORT LOGS: Regex matched {host} as a valid IPv4 address")
         return True
     elif isValidIPv6(host):
-        logger.info(f"Regex matched {host} as a valid IPv6 address")
+        globals.app.logger.info(f"SERVICE/PORT LOGS: Regex matched {host} as a valid IPv6 address")
         return False
     # If it is not IPv4 or IPv6 here, then we have a FQDN or Hostname and attempt to resolve  
     else:
         try:
             ipAddr = socket.gethostbyname(str(host))    
-            logger.info(f"Resolved IPv4 address is {ipAddr}")
+            globals.app.logger.info(f"Resolved IPv4 address is {ipAddr}")
             return True
         except socket.gaierror as e:
             errNum = e.errno
             if errNum == int(-5):
-                logger.info(f"Treating {host} as an IPv6 address")
+                globals.app.logger.info(f"SERVICE/PORT LOGS: Treating {host} as an IPv6 address")
                 return False
             elif errNum == int(-3):
-                logger.error(f"Failed to resolve {host} - Check DNS Entry. Assuming IPv4 in the meantime")
+                globals.app.logger.error(f"SERVICE/PORT LOGS: Failed to resolve {host} - Check DNS Entry. Assuming IPv4 in the meantime")
                 return True
             else:
-                logger.error(f"Socket Error in isIPv4 Function - {e}. Assuming IPv4 in the meantime")
+                globals.app.logger.error(f"SERVICE/PORT LOGS: Socket Error in isIPv4 Function - {e}. Assuming IPv4 in the meantime")
                 return True
         except Exception as e:
-            logger.error(f"Exception in isIPv4 Function - {e}. Assuming IPv4 in the meantime") 
+            globals.app.logger.error(f"SERVICE/PORT LOGS: Exception in isIPv4 Function - {e}. Assuming IPv4 in the meantime") 
             return True
 
 
@@ -121,20 +122,20 @@ def checkPing(host: str, count: int = 1) -> bool:
     Returns True if the host can be pinged
     Returns False if the host cannot be pinged
     '''
-    logger.info(f"Pinging host {host}")
+    globals.app.logger.info(f"Pinging host {host}")
     try:
         results = subprocess.run(f"ping {host} -W 1 -c {count}", shell=True, capture_output=True)
         exit_code = results.returncode
         stdout_string = " \\n ".join(line.strip() for line in str(results.stdout.decode("UTF-8")).splitlines())
         stderr_string = " \\n ".join(line.strip() for line in str(results.stderr.decode("UTF-8")).splitlines())
-        logger.info(f"Exit code {exit_code} from pinging {host}")
+        globals.app.logger.info(f"SERVICE/PORT LOGS: Exit code {exit_code} from pinging {host}")
         if exit_code == 0:
-            logger.info(f"Successful ping to host {host} - {stdout_string}")
+            globals.app.logger.info(f"SERVICE/PORT LOGS: Successful ping to host {host} - {stdout_string}")
             return True
-        logger.error(f"Failed to ping host {host} - {stderr_string}")
+        globals.app.logger.warning(f"SERVICE/PORT LOGS: Failed to ping host {host} - {stderr_string}")
         return False
     except Exception as e:
-        logger.error(f"Failed to ping host {host}. Got exception {str(e)}")
+        globals.app.logger.error(f"SERVICE/PORT LOGS: Failed to ping host {host}. Got exception {str(e)}")
         return False
 
 
@@ -144,21 +145,21 @@ def checkSocket(host: str, port: str|int) -> bool:
     Returns True if socket connection is successful (port is reachable)
     Returns False if socket connection failed (port is not reachable)
     '''
-    logger.info(f"Attempting to connect to socket {host}:{port}")
+    globals.app.logger.info(f"SERVICE/PORT LOGS: Attempting to connect to socket {host}:{port}")
     success = False
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) if isIPv4(host) else socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         s.settimeout(2)
         s.connect((host, int(port)))
         s.shutdown(socket.SHUT_RDWR)
-        logger.info(f"Successful connection to socket {host}:{port}")
+        globals.app.logger.info(f"SERVICE/PORT LOGS: Successful connection to socket {host}:{port}")
         success = True 
     except socket.gaierror as e:
-        logger.error(f"Failed connection to socket {host}:{port}. Get Address Info (DNS) error prevented socket connection. Exception: {e}")
+        globals.app.logger.warning(f"SERVICE/PORT LOGS: Failed connection to socket {host}:{port}. Get Address Info (DNS) error prevented socket connection. Exception: {e}")
     except TimeoutError as e:
-        logger.error(f"Failed connection to socket {host}:{port}. Connection timeout.")
+        globals.app.logger.warning(f"SERVICE/PORT LOGS: Failed connection to socket {host}:{port}. Connection timeout.")
     except Exception as e:
-        logger.error(f"Failed connection to connect to socket {host}:{port}. Exception {e}")
+        globals.app.logger.error(f"SERVICE/PORT LOGS: Failed connection to connect to socket {host}:{port}. Exception {e}")
     finally:
         s.close()
     return success
@@ -174,27 +175,27 @@ def checkWeb(host: str, port: int|str = 80, path: str = '/') -> bool:
     fqdn = re.compile('(?=^.{4,253}$)(^((?!-)[a-zA-Z0-9-]{1,63}(?<!-)\.)+[a-zA-Z]{2,63}\.?$)')
     if fqdn.search(host): # Check if host is FQDN. If True, IP version does not matter 
         url = f"http://{host}:{port}{path}"
-        logger.info("checkWeb is using FQDN")
+        globals.app.logger.info("SERVICE/PORT LOGS: checkWeb is using FQDN")
     elif isIPv4(host) == True: 
         url = f"http://{host}:{port}{path}"
-        logger.info("checkWeb is using IPv4")
+        globals.app.logger.info("SERVICE/PORT LOGS: checkWeb is using IPv4")
     else:
         url = f"http://[{host}]:{port}{path}" 
-        logger.info("checkWeb is using IPv6")
-    logger.info(f"Attempting to reach {url}")
+        globals.app.logger.info("SERVICE/PORT LOGS: checkWeb is using IPv6")
+    globals.app.logger.info(f"SERVICE/PORT LOGS: Attempting to reach {url}")
     try:
         result = requests.get(url=url)
-        logger.info(f"Web request returned {result.status_code}")
-        logger.debug(f"Web request returned {result.status_code}: {result.content}")
+        globals.app.logger.info(f"SERVICE/PORT LOGS: Web request returned {result.status_code}")
+        globals.app.logger.debug(f"SERVICE/PORT LOGS: Web request returned {result.status_code}: {result.content}")
         return result.status_code == 200
     except requests.exceptions.Timeout as e:
-        logger.error(f"Failed connection to {url}. Connection Timeout Exception: {e}")
+        globals.app.logger.warning(f"SERVICE/PORT LOGS: Failed connection to {url}. Connection Timeout Exception: {e}")
     except requests.exceptions.InvalidURL as e:
-        logger.error(f"Failed connection to {url}. Invalid URL Exception: {e}")
+        globals.app.logger.warning(f"SERVICE/PORT LOGS: Failed connection to {url}. Invalid URL Exception: {e}")
     except requests.exceptions.ConnectionError as e:
-        logger.error(f"Failed connection to {url}. Connection Error: {e}")
+        globals.app.logger.warning(f"SERVICE/PORT LOGS: Failed connection to {url}. Connection Error: {e}")
     except Exception as e:
-        logger.error(f"Failed connection to {url}. Got Exception: {e}")
+        globals.app.logger.error(f"SERVICE/PORT LOGS: Failed connection to {url}. Got Exception: {e}")
     return False
 
 
@@ -205,7 +206,7 @@ def checkService(service:dict) -> bool:
     Returns False is the service is unreachable. 
     '''
 
-    logger.info(f"Checking availability of service: {service}")
+    globals.app.logger.info(f"SERVICE/PORT LOGS: Checking availability of service: {service}")
     reachable = False
     service_type = service['type']
     if service_type == 'ping':
@@ -216,10 +217,10 @@ def checkService(service:dict) -> bool:
         reachable = checkWeb(service['host'], service['port'], service['path'])
     
     if reachable:
-        logger.info(f"Service available: {service}")
+        globals.app.logger.info(f"SERVICE/PORT LOGS: Service available: {service}")
         return True
     else:
-        logger.error(f"Service unavailable: {service}")
+        globals.app.logger.error(f"SERVICE/PORT LOGS: Service unavailable: {service}")
         return False
 
 
@@ -234,12 +235,12 @@ def waitForService(service:dict, interval: int = 2, max_attempts: int = 0):
     attempts = 0
     while True:
         attempts += 1
-        logger.info(f"Waiting for service to become available (attempt number {attempts}): {service}")
+        globals.app.logger.info(f"SERVICE/PORT LOGS: Waiting for service to become available (attempt number {attempts}): {service}")
         service_available = checkService(service)
         if service_available:
             return service_available
         if max_attempts and attempts == max_attempts:
-            logger.error(f"Service unavailable after max attempts ({attempts}): {service}")
+            globals.app.logger.error(f"SERVICE/PORT LOGS: Service unavailable after max attempts ({attempts}): {service}")
             return False
         sleep(interval)
 
@@ -249,14 +250,14 @@ def checkServiceLoop(service:dict, interval: int = 30, max_checks: int = 0) -> b
     Checks the availability of the service forever in a loop (or until max_checks is reached). Default time between checks is 30s. 
     '''
 
-    logger.info(f"Checking service {service} every {interval} seconds")
+    globals.app.logger.info(f"SERVICE/PORT LOGS: Checking service {service} every {interval} seconds")
     attempts = 0
     while True:
         attempts += 1
-        logger.info(f"Service check number {attempts} for {service}")
+        globals.app.logger.info(f"SERVICE/PORT LOGS: Service check number {attempts} for {service}")
         checkService(service)
         if max_checks and attempts == max_checks:
-            logger.info(f"Reached the maximum number of service checks ({max_checks}).. Will no longer check on service {service}.")
+            globals.app.logger.warning(f"SERVICE/PORT LOGS: Reached the maximum number of service checks ({max_checks}).. Will no longer check on service {service}.")
             return True
         sleep(interval)
 
@@ -273,26 +274,26 @@ def get_logs(service: dict) -> None:
             get_status_cmd = f"sshpass -p {service['password']} ssh -o StrictHostKeyChecking=no {service['user']}@{service['host']} 'systemctl is-active {service['service']}'"
             status_response = subprocess.run(get_status_cmd, shell=True,capture_output=True, timeout=10)
         except subprocess.TimeoutExpired:
-            logger.error(f"SERVICE_LOGGER: request to host timed out.")
+            globals.app.logger.warning(f"SERVICE/PORT LOGS: request to host timed out.")
             globals.services_status[service['service']] = [service['host'],f"request to host timed out. Trying again shortly"]
             continue
         except Exception as e:
-            logger.error(f"SERVICE_LOGGER: Exception has occurred when attempting to retrieve service status.")
-            logger.error(f"SERVICE_LOGGER: Exception: {e}")
+            globals.app.logger.error(f"SERVICE/PORT LOGS: Exception has occurred when attempting to retrieve service status.")
+            globals.app.logger.error(f"SERVICE/PORT LOGS: Exception: {e}")
             globals.services_status[service['service']] = [service['host'],f"Exception has occurred when attempting to retrieve service status."]
             continue
         if status_response.stdout.decode('utf-8') == '':
-            logger.error(f"SERVICE_LOGGER: Error has occurred when attempting to get service status.")
-            logger.error(f"SERVICE_LOGGER: Error: {status_response.stderr.decode('utf-8')}")
+            globals.app.logger.error(f"SERVICE/PORT LOGS: Error has occurred when attempting to get service status.")
+            globals.app.logger.error(f"SERVICE/PORT LOGS: {status_response.stderr.decode('utf-8')}")
             globals.services_status[service['service']] = [service['host'],f"Error has occurred when attempting to get service status."]
             continue
         if status_response.stdout.decode('utf-8').strip('\n') == 'failed':
             er = "SERVICE FAILED: "
-            logger.error(f"SERVICE_LOGGER: {er} {service['service']} is in failed state.")
+            globals.app.logger.error(f"SERVICE/PORT LOGS: {er} {service['service']} is in failed state.")
             globals.services_status[service['service']] = [service['host'],f"Service is in failed state."]
         elif status_response.stdout.decode('utf-8').strip('\n') == 'inactive':
             er = "SERVICE INACTIVE: "
-            logger.error(f"SERVICE_LOGGER: {er} {service['service']} is in inactive state.")
+            globals.app.logger.error(f"SERVICE/PORT LOGS: {er} {service['service']} is in inactive state.")
             globals.services_status[service['service']] = [service['host'],f"Service is in inactive state."]
         else:
             globals.services_status[service['service']] = [service['host'],f"Service is in active state."]
@@ -302,28 +303,28 @@ def get_logs(service: dict) -> None:
             log_response = subprocess.run(get_log_cmd, shell=True,capture_output=True,timeout=10)
             cur_logs = log_response.stdout.decode('utf-8')
         except subprocess.TimeoutExpired:
-            logger.error(f"SERVICE_LOGGER: SSH connection to host timed out.")
+            globals.app.logger.error(f"SERVICE/PORT LOGS: SSH connection to host timed out.")
             continue
         except Exception as e:
-            logger.error(f"SERVICE_LOGGER: Exception has occurred when attempting to retrieve logs.")
-            logger.error(f"SERVICE_LOGGER: Exception: {e}")
+            globals.app.logger.error(f"SERVICE/PORT LOGS: Exception has occurred when attempting to retrieve logs.")
+            globals.app.logger.error(f"SERVICE/PORT LOGS: Exception: {e}")
             continue
         if log_response.stdout.decode('utf-8') == '':
-            logger.error(f"SERVICE_LOGGER: Error has occurred when attempting to collect logs.")
-            logger.error(f"SERVICE_LOGGER: Error: {log_response.stderr.decode('utf-8')}")
+            globals.app.logger.error(f"SERVICE/PORT LOGS: Error has occurred when attempting to collect logs.")
+            globals.app.logger.error(f"SERVICE/PORT LOGS: Error: {log_response.stderr.decode('utf-8')}")
             continue
         if "No entries" in cur_logs:
             if er != False:
-                logger.error(f"SERVICE_LOGGER: {er} No new logs fe.")
+                globals.app.logger.error(f"SERVICE/PORT LOGS: {er} No new logs fe.")
             else:
-                logger.info(f"SERVICE_LOGGER: No new logs found at this time.")
+                globals.app.logger.info(f"SERVICE/PORT LOGS: No new logs found at this time.")
             continue
         output = cur_logs.split("\n")
         output.remove("")
         for line in output:
             if er == False:
-                logger.info(f"SERVICE_LOGGER: {line}")
+                globals.app.logger.info(f"SERVICE/PORT LOGS: {line}")
             else:
-                logger.error("SERVICE_LOGGER: "+ er + line)
+                globals.app.logger.error("SERVICE/PORT LOGS: "+ er + line)
         log_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 

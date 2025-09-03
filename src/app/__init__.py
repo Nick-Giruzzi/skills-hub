@@ -7,8 +7,7 @@ from apscheduler.events import EVENT_ALL, EVENT_JOB_MODIFIED ,EVENT_ALL_JOBS_REM
 #local imports
 from flaskConfig import FlaskConfig
 from app.cron import run_cron_thread
-#from app.functions import set_cron_vars, run_cron_thread, record_solves
-from app.extensions import globals, logger, db
+from app.extensions import globals, db
 from app.models import QuestionTracking, PhaseTracking, EventTracker
 
 
@@ -29,7 +28,7 @@ def create_app(config_class: FlaskConfig = FlaskConfig) -> Flask:
         db.create_all()
         
         def signal_handler(sig,frame):
-            logger.info(f"Signal Received -- Shutting down site")
+            app.logger.info(f"Signal Received -- Shutting down site")
             os._exit(0)
         signal.signal(signal.SIGTSTP, signal_handler)
         signal.signal(signal.SIGINT, signal_handler)
@@ -41,7 +40,7 @@ def create_app(config_class: FlaskConfig = FlaskConfig) -> Flask:
         @app.before_request
         def check_server_status():
             if not globals.server_ready:
-                logger.info(f"Tried to access site before server was marked as ready.")
+                app.logger.info(f"Tried to access site before server was marked as ready.")
                 flash("Please Note:<br>The lab is still starting up and some features may not be available. If an issue occurs, please wait a little bit and refresh. Lab will be ready if this message is not present upon refresh.")
 
         @app.before_request
@@ -78,37 +77,38 @@ def create_app(config_class: FlaskConfig = FlaskConfig) -> Flask:
                             sub_obj.data = json.dumps(cur_cnt)
                             db.session.commit()
                         except Exception as e:
-                            logger.error(f"Exception occurred trying to increment submission counter. (__init__.py, line 68). Exception: {str(e)}")
+                            app.logger.error(f"Exception occurred trying to increment submission counter. (__init__.py, line 68). Exception: {str(e)}")
                             sys.exit(1)
     return app
 
-def run_startup_scripts():
+
+def run_startup_scripts(app):
     successes = {}
     errors = {}
     if not globals.startup_enabled:
-        logger.info("Startup Scripts are disabled.")
+        app.logger.info("Startup Scripts are disabled.")
         return successes, errors
 
     if not globals.startup_workspace and globals.in_workspace:
-        logger.info("Startup scripts are disabled when running in a workspace. Skipping startup scripts")
+        app.logger.info("Startup scripts are disabled when running in a workspace. Skipping startup scripts")
         return successes, errors
 
     if (globals.startup_scripts == []) or (globals.startup_scripts == [None]) or (globals.startup_scripts == None):
-        logger.info("There are no startup scripts configured to run")
+        app.logger.error("Startup scripts enabled but no startup script is configured in 'config.yml'.")
         return successes, errors
 
     for startup_script in globals.startup_scripts:
-        logger.debug(f"Calling {startup_script}")
+        app.logger.debug(f"Calling {startup_script}")
     
         # run the startup script and parse output into a dict
         ## The output variable has properties output.stdout  and  output.stderr
         try:
             output = subprocess.run([f"{globals.custom_script_dir}/{startup_script}"], capture_output=True, check=True).stdout.decode('utf-8').replace("\n", r"\n")
-            logger.info(f"Stdout from Startup Script {startup_script}: {output}")
+            app.logger.debug(f"Stdout from Startup Script {startup_script}: {output}")
             successes[startup_script] = output
         # Something happened if there was a non-zero exit status. Log this and set fatal_error
         except subprocess.CalledProcessError as e:
-            logger.error(f"Startup script {startup_script} returned with non-zero exit status {e.returncode}.\tStdout: {e.stdout}\tStderr: {e.stderr}")
+            app.logger.error(f"Startup script {startup_script} returned with non-zero exit status {e.returncode}.\tStdout: {e.stdout}\tStderr: {e.stderr}")
             errors[startup_script] = f"stdout: {e.stdout}\tstderr: {e.stderr}"
     return successes, errors
 
@@ -116,12 +116,12 @@ def run_startup_scripts():
 def start_grading_server(app):
     # exit if server is not enabled
     if not globals.grading_enabled and not globals.hosted_files_enabled:
-        logger.info("Website features not enabled. Will serve disabled page from /.")
+        app.logger.info("Website features not enabled. Will serve disabled page from /.")
     else:
-        logger.info(f"Starting grading server website with grading modes {globals.grading_mode}")
+        app.logger.info(f"Starting grading server website with grading modes {globals.grading_mode}")
         # if using the cron mode, we need to set the config variables and start/schedule the grading thread
         if 'cron' in globals.grading_mode:
-            logger.info(f"Waiting {globals.cron_delay} seconds until executing cron-style grading")
+            app.logger.info(f"Waiting {globals.cron_delay} seconds until executing cron-style grading")
             cron_thread = threading.Timer(globals.cron_delay, run_cron_thread)
             cron_thread.start()
 
@@ -145,7 +145,7 @@ def start_grading_server(app):
 
     globals.scheduler.start()
     # Log that the server is starting up and start server on port 80
-    logger.info(f"Starting the Skills Hub.")
+    app.logger.info(f"Starting the Skills Hub.")
     #app.run(host='127.0.0.1', port=8888, debug=False, ssl_context=(f'{globals.ssl_dir}/host.pem', f'{globals.ssl_dir}/host-key.pem'))
     app.run(
         host=globals.app_host,

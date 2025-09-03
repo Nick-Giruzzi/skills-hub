@@ -38,7 +38,7 @@ def runSSHCommand(username=None, password=None, hostname=None, cmdList=None):
             results[f"cmd{index}"] = {
                 "commandExecute":cmd,
                 "stdout":"",
-                "stderr":f"Error occurred during command execution.\error msg:\t{str(e)}"
+                "stderr":f"Error occurred during command execution.\nerror msg:\t{str(e)}"
             }
     ssh.close()
     return results
@@ -100,6 +100,7 @@ def execute_in_docker(file_name=None, docker_image=None, libs=False, lib_folder=
 
 def phase1(sub=None):
     results = dict()
+    print(sub)
     if sub['GradingCheck1'] == 'b':      # This is just an example that checks if the data passed (if any) passes the required condition to pass the grading check
         results['GradingCheck1'] = "Success -- Correct option chosen"
     else:
@@ -126,28 +127,16 @@ if __name__ == '__main__':
     args = sys.argv[1:]
     if len(args) > 0:
         passed_phase = args[-1].strip().lower()
-        if passed_phase in phases:
-            ## This code will execute IF phases is enabled & current phase was passed to script.
-            args.pop(-1)
-            if len(args) != 0:
-                ## This code executes if user submitted answer & it was passed to grading script. 
-                submissions = json.loads(args[0])
-                res = globals()[passed_phase](submissions)
-            else:
-                # This code executes if no submission made from user
-                res = globals()[passed_phase]()
-                
-            for key,val in res.items():
-                print(key, ' : ', val)
+        submissions = json.loads(args[0])
+        res = None
+        if passed_phase == 'phase1':
+            res = phase1(submissions)
+        elif passed_phase == 'phase2':
+            res = phase2(submissions)
         else:
-            # This code will execute if phases are disabled BUT there is still a submission from the user. For this example, we will execute all the functions above. 
-            submissions = json.loads(args[0])
-            res = dict()
-            for phase in phases:    
-                res.update(globals()[phase](submissions))
-                
-            for key,val in res.items():
-                print(key, ' : ', val)
+            res = phase3(submissions)
+        for key,val in res.items():
+            print(key, ' : ', val)
     else:
         ## This code will execute if no args were passed, which means that phases are disabled & no submissions occur from user
         res = dict()

@@ -4,7 +4,7 @@ import datetime, json, sys
 from typing import Any
 from flask import current_app, Flask
 #from app.cmi5 import cmi5_send_answered, cmi5_send_completed
-from app.extensions import db, globals, record_solves_lock, logger
+from app.extensions import db, globals, record_solves_lock
 from app.models import EventTracker, PhaseTracking, QuestionTracking
 
 
@@ -16,7 +16,7 @@ def initialize_db(app: Flask, conf: dict) -> None:
                 #if ('phase_info' not in conf['grading'] or (len(conf['grading']['phase_info']) == 0)):
                 phase_info = conf['grading'].get('phase_info', False)
                 if (not phase_info) or (len(conf['grading'].get('phase_info')) == 0):
-                    logger.error("Error: Phase info missing, disabled, or no phases have been configured. This is required if phases are enabled.")
+                    app.logger.error("Phase info missing, disabled, or no phases have been configured. This is required if phases are enabled.")
                     sys.exit(1)
                 globals.phases = phase_info
                 
@@ -44,7 +44,7 @@ def initialize_db(app: Flask, conf: dict) -> None:
                             db.session.add(new_phase)
                             db.session.commit()
                     except Exception as e:
-                        logger.error(f"Exception occurred: Unable to add phase {phase} to DB. Exception:{e}.\nExiting.")
+                        app.logger.error(f"Exception occurred: Unable to add phase {phase} to DB. Exception:{e}.\nExiting.")
                         sys.exit(1)
 
             ## Here we will add all questions to DB for tracking
@@ -63,8 +63,8 @@ def initialize_db(app: Flask, conf: dict) -> None:
                         db.session.add(new_question)
                         db.session.commit()
                 except Exception as e:
-                    logger.error(', '.join(globals.question_order))
-                    logger.error(f"Exception occurred: Unable to add question {key} to DB. Exception:{e}.\nExiting.")
+                    app.logger.error(', '.join(globals.question_order))
+                    app.logger.error(f"Exception occurred: Unable to add question {key} to DB. Exception:{e}.\nExiting.")
                     sys.exit(1)
 
 
@@ -92,22 +92,22 @@ def record_solves() -> None:
 
 
 def check_db(label: str) -> bool:
-    with current_app.app_context():
+    with globals.app.app_context():
         cur_question = QuestionTracking.query.filter_by(label=label).first()
         if cur_question == None:
-            logger.error("No entry found in DB while attempting to mark question completed. Exiting")
+            globals.app.logger.error("No entry found in DB while attempting to mark question completed. Exiting")
             sys.exit(1) 
         return cur_question.solved
 
 
 def update_db(type_q: str,label: str = None, val: str = None) -> Any:
-    with current_app.app_context():
+    with globals.app.app_context():
         if type_q == 'q':
             try:
                 cur_question = QuestionTracking.query.filter_by(label=label).first()
                 if cur_question == None:
-                    logger.error("No entry found in DB while attempting to mark question completed. Exiting")
-                    logger.error("---- NOTE: IF PREVIOUSLY WORKED, ERROR LIKELY CAUSED BY EXTRA TEXT BEING PRINTED FROM GRADING SCRIPT.")
+                    globals.app.logger.error("No entry found in DB while attempting to mark question completed. Exiting")
+                    globals.app.logger.error("---- NOTE: IF PREVIOUSLY WORKED, ERROR LIKELY CAUSED BY EXTRA TEXT BEING PRINTED FROM GRADING SCRIPT.")
                     sys.exit(1) 
                 if (val != None) and ('--' in val):
                     cur_question.response = val.split('--',1)[1]
@@ -118,15 +118,15 @@ def update_db(type_q: str,label: str = None, val: str = None) -> Any:
                     cur_question.time_solved = datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                 db.session.commit()
             except Exception as e:
-                logger.error(f"Exception occurred while update DB with completed question. Exception: {e}. Exiting.")
+                globals.app.logger.error(f"Exception occurred while update DB with completed question. Exception: {e}. Exiting.")
                 sys.exit(1)
-            logger.info(f"Question {cur_question.label} marked completed in DB.")
+            globals.app.logger.info(f"Question {cur_question.label} marked completed in DB.")
             
         else:
             for p in globals.phase_order:
                 phase = PhaseTracking.query.filter_by(label=p).first()
                 if phase == None:
-                    logger.error("No entry found in DB while attempting to find current phase during DB update. Exiting")
+                    globals.app.logger.error("No entry found in DB while attempting to find current phase during DB update. Exiting")
                     sys.exit(1) 
                 if phase.solved == False:
                     q_list = phase.tasks.split(',')
@@ -134,7 +134,7 @@ def update_db(type_q: str,label: str = None, val: str = None) -> Any:
                     for q in q_list:
                         cur_q = QuestionTracking.query.filter_by(label=q).first()
                         if cur_q == None:
-                            logger.error("No entry found in DB while attempting to update phase DB. Exiting")
+                            globals.app.logger.error("No entry found in DB while attempting to update phase DB. Exiting")
                             sys.exit(1) 
                         if cur_q.solved == True:
                             num_q -= 1
@@ -150,12 +150,11 @@ def update_db(type_q: str,label: str = None, val: str = None) -> Any:
 
 
 def get_current_phase() -> str:
-    with current_app.app_context():
+    with globals.app.app_context():
         for phase in globals.phase_order:
             cur_phase = PhaseTracking.query.filter_by(label=phase).first()
             if cur_phase == None:
-                #logger.error(f"Error occurred during grading. Queried PhaseTracking with phase key that does not exit. key: {phase}. Exiting.")
-                logger.warning(f"Attempted query of current phase and no record found with phase {phase}. Lab likely booting for first time.")
+                globals.app.logger.warning(f"Attempted query of current phase and no record found for phase {phase}. Lab likely booting for first time.")
                 raise KeyError
             if cur_phase.solved == False:
                 globals.current_phase = cur_phase.label

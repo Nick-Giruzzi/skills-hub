@@ -6,61 +6,12 @@ from flask_cors import CORS
 from concurrent.futures import ThreadPoolExecutor
 # local imports
 from app import create_app, start_grading_server, run_startup_scripts
-#from app.functions import read_config, done_grading, get_logs
-#from app.portServiceChecker import waitForService, checkServiceLoop, checkLocalPortLoop
-#from app.extensions import logger, globals
 from app.grading import done_grading
 from app.portServiceChecker import get_logs, waitForService, checkServiceLoop, checkLocalPortLoop
-from app.extensions import globals, logger
+from app.extensions import globals
 from app.globals import Globals
 from app.databaseHelpers import initialize_db
-
-LOG_LEVELS = {
-    'DEBUG': logging.DEBUG,
-    'INFO': logging.INFO,
-    'WARNING': logging.WARNING,
-    'ERROR': logging.ERROR,
-    'CRITICAL': logging.CRITICAL,
-}
-
-
-def valid_log_level(level:str) -> str:
-    """
-    Ensure log level is valid and transform to uppercase.
-
-    Args:
-        level (str): Log level.
-
-    Raises:
-        argparse.ArgumentTypeError: Raised if invalid log level is provided.
-
-    Returns:
-        str: Log level (uppercase)
-    """
-
-    level_str = level.upper()
-    if level_str not in LOG_LEVELS:
-        raise argparse.ArgumentTypeError(f"Invalid log level: {level}")
-    return level_str
-
-
-def configure_logging(level: str):
-    """
-    Configures logging for the given level.
-
-    Args:
-        level (str): Log level
-    """
-
-    log_level = LOG_LEVELS[level]
-    root = logging.getLogger()
-    root.setLevel(log_level)
-    for h in root.handlers:
-        h.setLevel(log_level)
-    logger.setLevel(log_level)
-    logger.debug("Debug logs enabled")
-    logger.info("Info logs enabled")
-
+from app.loggingConfig import setup_logging
 
 # Create flask app obj
 app = create_app()
@@ -75,15 +26,8 @@ if __name__ == '__main__':
                         default="INFO")
     args = parser.parse_args()
 
-    log_level = valid_log_level(args.log_level)
-
-    if args.debug:
-        log_level = "DEBUG"
-
-    configure_logging(log_level)
-
     if os.geteuid() != 0:
-        logger.error("Program must be ran by root.")
+        app.logger.error("Program must be ran by root.")
         sys.exit(1)
         
     CORS(app)
@@ -91,10 +35,13 @@ if __name__ == '__main__':
     globals.executor.add_default_done_callback(done_grading)
     
     # Read the configuration
-    logger.info(f"Skills Hub starting up")
-    logger.debug("Skills Hub Operating in a Workspace" if globals.in_workspace else "Skills Hub Operating in a Gamespace")
+    app.logger.info(f"Skills Hub starting up")
+    app.logger.debug("Skills Hub Operating in a Workspace" if globals.in_workspace else "Skills Hub Operating in a Gamespace")
     #read_config(app)
-    Globals.from_yaml(globals)
+
+    Globals.from_yaml(globals, app)
+
+    setup_logging(app)
 
     initialize_db(app, globals.conf)
 
@@ -103,30 +50,32 @@ if __name__ == '__main__':
     grading_server_thread.start()
     
     # wait for blocking services to come up
-    logger.info(f"Waiting for blocking services to become available")
+    app.logger.info(f"Waiting for blocking services to become available")
     globals.blocking_threadpool.map(waitForService, globals.blocking_services)
     globals.blocking_threadpool.shutdown(wait=True)
-    logger.info(f"All blocking services are available")
+    app.logger.info(f"All blocking services are available")
 
     # run startup scripts
-    successes, errors = run_startup_scripts()
+    successes, errors = run_startup_scripts(app)
     if errors:
-        logger.error(f"Startup scripts exited with error(s): {list(errors.keys())}")
+        app.logger.error(f"Startup scripts exited with error(s): {list(errors.keys())}")
         sys.exit(1)
     if successes: 
-        logger.info(f"All startup scripts exited normally: {list(successes.keys())}")
+        app.logger.info(f"All startup scripts exited normally: {list(successes.keys())}")
 
     globals.server_ready = True # mark server as ready after startup scripts finish
 
     # run a thread that will periodically check on all required services
-    service_check_pool = ThreadPoolExecutor(thread_name_prefix="ServiceCheck")
-    service_check_pool.map(checkServiceLoop, globals.required_services)
+    if (globals.required_services != []) and (globals.required_services != None):
+        app.logger.info("Starting check on required services.")
+        service_check_pool = ThreadPoolExecutor(thread_name_prefix="ServiceCheck")
+        service_check_pool.map(checkServiceLoop, globals.required_services)
 
     # run a thread that will periodically list the local open ports 
     port_checker_thread = threading.Thread(target=checkLocalPortLoop, name="LocalPortChecker")
     
     if globals.services_list != None:
-        service_checker_pool = ThreadPoolExecutor(thread_name_prefix="Service_Logger")
+        service_checker_pool = ThreadPoolExecutor(thread_name_prefix="Service_logger")
         service_check_pool.map(get_logs, globals.services_list)
     
     port_checker_thread.start()

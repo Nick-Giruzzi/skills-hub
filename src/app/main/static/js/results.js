@@ -1,11 +1,31 @@
-(function () {
-    x = setInterval(function () {
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", "/lab/update", true);
-        xhr.onerror = err => console.log('error: ' + err.message);
-        xhr.onload = function() {
-            if (this.readyState == 4 && this.status == 200) {
-                res = JSON.parse(this.responseText);
+window.addEventListener('load', function() {
+    // Small delay to ensure everything is ready
+    setTimeout(function() {
+        const eventSource = new EventSource('/lab/update', {
+            withCredentials: false
+        });
+
+        eventSource.onopen = function() {
+            console.log("SSE Connection opened successfully");
+        }
+
+        eventSource.onerror = function(error) {
+            console.error("SSE Error Details:");
+            console.error("ReadyState:", eventSource.readyState);
+            console.error("Error event:", error);
+            
+            if (eventSource.readyState === EventSource.CLOSED) {
+                console.error("Connection was closed");
+            } else if (eventSource.readyState === EventSource.CONNECTING) {
+                console.log("Reconnecting...");
+            }
+        }
+
+        eventSource.onmessage = function(event) {
+            //console.log("Received data: ", event.data);
+            try {
+                const res = JSON.parse(event.data);
+                // Your update logic here
 
                 var data = document.getElementById('results');
 
@@ -207,10 +227,11 @@
                     child2.appendChild(regrade);
                     child1.appendChild(child2);
                     data.appendChild(child1);
-
                 }
             }
+            catch (error) {
+                console.error("Error parsing data:", error);
+            }
         }
-        xhr.send();
-    },1000);
-})();
+    }, 1000);
+});

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block header %}    
+{% endblock %}
+
+{% block content %}
+
+<div class="page_name">
+    <h2>Settings Page</h2>
+</div>
+
+<div class="settings-container">
+    <fieldset class="settings-form">
+        <form id="settingsForm" action="{{url_for('info.settings')}}" method="POST">
+            <table class="settings-table">
+                <tr>
+                    <td>Accessibility Mode</td>
+                    <td>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="accessibilityToggle" {% if g.globs.accessible_enabled %}checked{% endif %}>
+                            <span class="slider"></span>
+                        </label>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Generate User Report</td>
+                    <td>
+                        <button type="button" class="generate-btn" onclick="generateReport()">
+                            Download Report
+                        </button>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Restart Server</td>
+                    <td>
+                        <button type="button" class="generate-btn" onclick="restart()">
+                            Restart
+                        </button>
+                    </td>
+                </tr>
+            </table>
+        </form>
+    </fieldset>
+</div>
+
+<script type="text/javascript" src="{{ url_for('info.static', filename='js/settings.js')}}"></script>
+
+{% endblock %}

@@ -5,6 +5,9 @@ Wants=network.target dnsmasq.service
 
 [Service]
 Type=simple
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=skillsHub
 WorkingDirectory=/home/user/skillsHub/
 ExecStart=python3 /home/user/skillsHub/app.py
 ExecStop=-/usr/bin/pkill -f app.py

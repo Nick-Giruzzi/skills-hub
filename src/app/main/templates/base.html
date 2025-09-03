@@ -50,9 +50,7 @@
             </div>
             <div class="navbar-side right">
                 <ul class="navbarul">
-                    <li class="access"><a class="navbar_elements" href="{{url_for('main.change_mode')}}">Accessibility Mode: 
-                    {%if g.globs.accessible_enabled %}Enabled{%else%}Disabled{%endif%}
-                </a></li>
+                    <li class="access"><a class="navbar_elements" href="{{url_for('info.settings')}}">Settings</a></li>
                 </ul>
             </div>
         </nav>

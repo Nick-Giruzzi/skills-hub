@@ -7,10 +7,10 @@ app:
 
 startup:
   # Set this to false if you don't want your startup scripts to run in a workspace (only in a gamespace)
-  enabled: true
+  enabled: false
   runInWorkspace: false
   scripts: 
-    - startupScript.sh
+    - 
 
 required_services:
   ## Example: Ensure you can ping this host before startup scripts kick off
@@ -67,7 +67,7 @@ grading:
   cron_delay: 10
   cron_limit: null
   rate_limit: 0
-  token_location: guestinfo
+  token_location: static
   tokens:
     GradingCheck1: "token1"
     GradingCheck2: "token2"
@@ -89,7 +89,7 @@ grading:
       text: "Click button for grading."
       mode: button
     GradingCheck3:
-      name: Q3
+      token_name: Q3
       text: "What option do you choose?"
       mode: mc
       opts:

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-import subprocess, os, logging, yaml, socket, sys
+import subprocess, os, yaml, socket, sys
+from flask import Flask
 from flask_apscheduler import APScheduler
 from datetime import timedelta, time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, List, Dict, Set, Union
-from app.extensions import logger
 
 class Globals():
     def __init__(self) -> None:
@@ -20,12 +20,22 @@ class Globals():
         self.basedir: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.custom_script_dir: str = f"{self.basedir}/custom_scripts"
         self.hosted_file_directory: str = f"{self.basedir}/hosted_files"
+        if not os.path.exists(self.hosted_file_directory):
+            os.mkdir(self.hosted_file_directory)
         self.uploaded_file_directory: str = f"{self.basedir}/uploaded_files"
+        if not os.path.exists(self.uploaded_file_directory):
+            os.mkdir(self.uploaded_file_directory)
         self.yaml_path: str = f"{self.basedir}/config.yml"
         self.ssl_dir: str = f"{self.basedir}/app/ssl"
         self.challenge_files: str = f"{self.basedir}/challenge_files"
+        if not os.path.exists(self.challenge_files):
+            os.mkdir(self.challenge_files)
+        self.logs_dir: str = f"{self.basedir}/logs"
+        if not os.path.exists(self.logs_dir):
+            os.mkdir(self.logs_dir)
 
         # Initialize overridable vars
+        self.app: Flask = None
         self.app_host: str = "0.0.0.0"
         self.app_port: int = 8888
         #self.app_cert: Optional[str] = None
@@ -59,7 +69,7 @@ class Globals():
         self.grading_rateLimit: timedelta = timedelta(seconds=0)
         self.grading_parts: Optional[dict] = None
         self.question_order: List[str] = []
-        self.token_location: str = "guestinfo"
+        self.token_location: str = ""
         self.submission_method: str = "display"
         self.grader_post: bool = False
         self.services_list: Optional[List[dict]] = None
@@ -216,7 +226,6 @@ class Globals():
             socket.gethostbyname(conf_val)
             return conf_val
         except (socket.gaierror, TypeError):
-            logging.warning(f"Invalid IP or hostname '{conf_val}', defaulting to '{default}'")
             return default
 
 
@@ -237,20 +246,18 @@ class Globals():
 
         if isinstance(conf_val, int) and 1 <= conf_val <= 65535:
             return conf_val
-        logging.warning(f"Invalid port '{conf_val}', defaulting to {default}")
         return default
 
 
-    def load_config(self, conf: dict):
-        logging.info("Loading application config")
+    def load_config(self, conf: dict, app: Flask):
+        app.logger.info("Loading application config")
         self.conf = conf
+        self.app = app
         self.app_host = self.resolve_ip(conf.get('app', {}).get('host'), '0.0.0.0')
         self.app_port = self.resolve_port(conf.get('app', {}).get('port'), 8888)
         self.startup_scripts = conf.get('startup', {}).get('scripts',[])
         self.startup_enabled = conf.get('startup', {}).get('enabled',False)
         self.startup_workspace = conf.get('startup', {}).get('runInWorkspace',False)
-        #self.app_cert = self.resolve(conf.get('app', {}).get('tls_cert'))
-        #self.app_key = self.resolve(conf.get('app', {}).get('tls_key'))
         self.lab_name = self.resolve(conf.get('lab_name'), "")
         self.port_checker = self.resolve_bool(conf.get('port_checker'), False)
         self.grading_enabled = self.resolve_bool(conf.get('grading').get('enabled'), False)
@@ -260,6 +267,16 @@ class Globals():
         if (self.grading_enabled) and (conf.get('grading').get('cron_grading', False)):
             self.cron_grading_script = self.resolve(conf.get('grading').get('cron_grading_script'))
             self.grading('cron')
+        if self.grading_enabled:
+            token_loc = conf.get('grading').get('token_location', '')
+            if token_loc in self.VALID_TOKEN_LOCATIONS:
+                app.logger.info(f"Token location set as: {token_loc}")
+                self.token_location = token_loc
+                if self.token_location == 'static':
+                    self.static_tokens = conf.get('grading').get('tokens')
+            else:
+                app.logger.warning(f"Unknown token location configured in config.yml. Defaulting to'guestinfo'")
+                self.token_location = 'guestinfo'
         self.hosted_files_enabled = self.resolve_bool(conf.get('hosted_files').get('enabled'), False)
         self.info_home_enabled = self.resolve_bool(conf.get('info_and_services'), False)
         self.services_home_enabled = self.resolve_bool(conf.get('info_and_services'), False)
@@ -270,63 +287,64 @@ class Globals():
         if 'manual' in self.grading_mode:
             try:
                 if not os.access(os.path.join(self.custom_script_dir,self.manual_grading_script), os.X_OK):
-                    logging.error(f"Manual grading script {self.manual_grading_script} is not executable.")
+                    app.logger.error(f"Manual grading script {self.manual_grading_script} is not executable.")
                     exit(1)
             except Exception as e:
-                logging.error(f"Got exception {e} while checking if manual grading script {self.manual_grading_script} is executable.")
+                app.logger.error(f"Got exception {e} while checking if manual grading script {self.manual_grading_script} is executable.")
                 exit(1)
         if 'cron' in self.grading_mode:
             try:
                 if not os.access(os.path.join(self.custom_script_dir,self.cron_grading_script), os.X_OK):
-                    logging.error(f"Cron grading script {self.cron_grading_script} is not executable.")
+                    app.logger.error(f"Cron grading script {self.cron_grading_script} is not executable.")
                     exit(1)
             except Exception as e:
-                logging.error(f"Got exception {e} while checking if cron grading script {self.cron_grading_script} is executable.")
+                app.logger.error(f"Got exception {e} while checking if cron grading script {self.cron_grading_script} is executable.")
                 exit(1)
         self.required_services = conf.get('required_services', [])
-        if self.required_services == []:
-            logger.info("No required services configured.")
+        if (self.required_services == []) or (self.required_services == None):
+            ...
+            app.logger.info("No required services configured.")
         else:
             for service in self.required_services:
                 # ensure host is defined in required services
                 if 'host' not in service:
-                    logger.error(f"Missing host definition in required service: {service}")
+                    app.logger.error(f"Missing host definition in required service: {service}")
                     exit(1)
                 # ensure type is defined in required services. If default to ping type. 
                 if 'type' not in service:
-                    logger.info(f"Missing type definition in required service: {service}. Defaulting to ping.")
+                    app.logger.info(f"Missing type definition in required service: {service}. Defaulting to ping.")
                     service['type'] = "ping"
                 # ensure defined type is valid
                 if service['type'] not in self.VALID_SERVICE_TYPES:
-                    logger.error(f"Invalid required service type in: {service}. Valid types are {self.VALID_SERVICE_TYPES}.")
+                    app.logger.error(f"Invalid required service type in: {service}. Valid types are {self.VALID_SERVICE_TYPES}.")
                     exit(1)
                 # ensure port is defined for socket type
                 if service['type'] == 'socket' and 'port' not in service:
-                    logger.error(f"Missing port definition in required service: {service}. Port definition is required with socket type")
+                    app.logger.error(f"Missing port definition in required service: {service}. Port definition is required with socket type")
                     exit(1)
                 # ensure web options are set/defaulted
                 if service['type'] == 'web':
                     if 'port' not in service:
-                        logger.info(f"Missing web port definition in required service: {service}. Defaulting to 80")
+                        app.logger.info(f"Missing web port definition in required service: {service}. Defaulting to 80")
                         service['port'] = 80
                     if 'path' not in service:
-                        logger.info(f"Missing web path definition in required service: {service}. Defaulting to /")
+                        app.logger.info(f"Missing web path definition in required service: {service}. Defaulting to /")
                         service['path'] = '/'
                 # ensure block startup scripts is defined. Default to False if not
                 if 'block_startup_scripts' not in service:
-                    logger.info(f"Missing block startup script definition in service: {service}. Defaulting to False")
+                    app.logger.info(f"Missing block startup script definition in service: {service}. Defaulting to False")
                     service['block_startup_scripts'] = False
                 if not isinstance(service['block_startup_scripts'], bool):
-                    logger.error(f"Invalid type for block_startup_scripts. Must be true/false")
+                    app.logger.error(f"Invalid type for block_startup_scripts. Must be true/false")
                     exit(1)
                 # add to blocking services if needed
                 if service['block_startup_scripts']:
                     self.blocking_services.append(service)
-        logging.debug(f"Final Config: {self}")
+        app.logger.debug(f"Final Config: {self}")
 
 
     @classmethod
-    def from_yaml(cls, instance: Optional["Globals"] = None) -> "Globals":
+    def from_yaml(cls, instance: Optional["Globals"] = None, app: Optional["Flask"] = None) -> "Globals":
         instance = instance or cls()
         if not os.path.isfile(instance.yaml_path):
             print("Could not find config.yml file.")
@@ -339,7 +357,7 @@ class Globals():
                 print("Error Reading YAML in config file")
                 sys.exit(1)
 
-        instance.load_config(conf or {})
+        instance.load_config(conf or {}, app)
         return instance
 
     def mv_challenge_files(self):

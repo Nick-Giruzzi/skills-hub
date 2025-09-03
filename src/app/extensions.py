@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
+from logging.handlers import RotatingFileHandler
 from flask_sqlalchemy import SQLAlchemy
 from threading import Lock
 # local imports
@@ -16,7 +17,3 @@ record_solves_lock = Lock()
 
 # Instantiate globals object
 globals = Globals()
-
-# configure logging obj (default log level of INFO)
-logging.basicConfig(format=f'SKILLS-HUB | %(threadName)s | %(levelname)s | {globals.support_code} | {globals.challenge_code} | Variant {globals.variant_index} | %(message)s', level=logging.INFO)
-logger = logging.getLogger("SkillsHub")
