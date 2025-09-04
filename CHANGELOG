@@ -1,5 +1,13 @@
 Skills Hub Changelog
 
+9/4/2025
+- Added ability for user to manually configure SSL Certificates in config.
+    - Files affected: globals.py, __init__.py, config.yml
+- Added baselevel README.md, updated config README.md, and updated grading README.md.
+    - Files affected: ./README.md, ./src/custom_scripts/README.md, ./src/README.md
+- Added pip requirement and apt installed files 
+    - Files affected: requirements.txt, pip.list, apt.list
+
 8/28/2025
 - Added 'Settings' page, moved "Accessibility" page to it as well as restart functionality and generating user report
     - Files affected: settings.js, settings.html, info.py, accessible.css, base.css, base.html, main.py

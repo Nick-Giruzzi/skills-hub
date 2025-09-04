@@ -146,11 +146,11 @@ def start_grading_server(app):
     globals.scheduler.start()
     # Log that the server is starting up and start server on port 80
     app.logger.info(f"Starting the Skills Hub.")
-    #app.run(host='127.0.0.1', port=8888, debug=False, ssl_context=(f'{globals.ssl_dir}/host.pem', f'{globals.ssl_dir}/host-key.pem'))
+    ssl_context = (os.path.join(globals.ssl_dir, globals.app_cert), os.path.join(globals.ssl_dir, globals.app_key))
     app.run(
         host=globals.app_host,
         port=globals.app_port,
         debug=False,
-        ssl_context=(f'{globals.ssl_dir}/host.pem', f'{globals.ssl_dir}/host-key.pem')
+        ssl_context=ssl_context
     )
 

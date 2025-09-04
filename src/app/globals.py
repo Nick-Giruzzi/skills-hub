@@ -38,10 +38,10 @@ class Globals():
         self.app: Flask = None
         self.app_host: str = "0.0.0.0"
         self.app_port: int = 8888
-        #self.app_cert: Optional[str] = None
-        #self.app_key: Optional[str] = None
+        self.app_cert: Optional[str] = None
+        self.app_key: Optional[str] = None
         self.lab_name: str = ""
-        #self.port_checker: bool = False
+        self.port_checker: bool = False
         self.grading_enabled: bool = False
         self.hosted_files_enabled: bool = False
         self.info_home_enabled: bool = False
@@ -255,6 +255,14 @@ class Globals():
         self.app = app
         self.app_host = self.resolve_ip(conf.get('app', {}).get('host'), '0.0.0.0')
         self.app_port = self.resolve_port(conf.get('app', {}).get('port'), 8888)
+        self.app_cert = conf.get('app').get('tls_cert', '')
+        self.app_key = conf.get('app').get('tls_key', '')
+        if (self.app_cert == '') or (self.app_key == ''):
+            app.logger.error("One or both required files to run over HTTPS not configured")
+            exit(1)
+        elif (not os.path.isfile(os.path.join(self.ssl_dir, self.app_cert))) or (not os.path.isfile(os.path.join(self.ssl_dir, self.app_key))):
+            app.logger.error("One or both of the configured TLS files do not exist.")
+            exit(1)
         self.startup_scripts = conf.get('startup', {}).get('scripts',[])
         self.startup_enabled = conf.get('startup', {}).get('enabled',False)
         self.startup_workspace = conf.get('startup', {}).get('runInWorkspace',False)
@@ -282,7 +290,6 @@ class Globals():
         self.services_home_enabled = self.resolve_bool(conf.get('info_and_services'), False)
         if self.resolve_bool(conf.get('info_and_services').get('bookmarks_enabled'),False):
             self.bookmarks = conf.get('info_and_services').get('bookmarks')
-        #self.cmi5_enabled = self.resolve_bool('CS_CMI5_ENABLED', conf.get('cmi5'), False)
         self.grading_parts = conf['grading']['parts']
         if 'manual' in self.grading_mode:
             try:

@@ -4,6 +4,8 @@ lab_name: ""
 app:
   host: "0.0.0.0"
   port: 8888
+  tls_cert: 'host.pem'
+  tls_key: 'host-key.pem'
 
 startup:
   # Set this to false if you don't want your startup scripts to run in a workspace (only in a gamespace)
@@ -38,7 +40,7 @@ hosted_files:
 info_and_services:
   info_home_enabled: false
   services_home_enabled: false
-  bookmarks_enabled: false
+  bookmarks_enabled: true
   bookmarks:
     mail: "https://box.skills.hub/"
     firewall: "https://pfsense.skills.hub/"
@@ -59,7 +61,7 @@ grading:
   enabled: true
   grader_post: false
   manual_grading: true
-  manual_grading_script: manualGradingExample.py
+  manual_grading_script: grading.py
   cron_grading: false
   cron_grading_script: null
   cron_interval: 5
@@ -82,25 +84,24 @@ grading:
   parts:
     GradingCheck1:
       token_name: Q1
-      text: "Example question text?"
-      mode: text
-    GradingCheck2:
-      token_name: Q2
-      text: "Click button for grading."
-      mode: button
-    GradingCheck3:
-      token_name: Q3
-      text: "What option do you choose?"
+      text: "Who was the best Batman?"
       mode: mc
       opts:
-        a: "answer1"
-        b: "answer2"
-        c: "answer3"
+        a: "Michael Keaton"
+        b: "Ben Affleck (Bafflack)"
+        c: "Christian Bale"
+    GradingCheck2:
+      token_name: Q2
+      text: "Upload file to analyze."
+      mode: upload
+    GradingCheck3:
+      token_name: Q3
+      text: "Why is a corn field so hard to escape from?" # It's a maize
+      mode: text
 
 
   phases: true
   phase_info:
     phase1: ["GradingCheck1"]
     phase2: ["GradingCheck2"]
-    phase3: ["GradingCheck3"]
-    #mini_lab: []
+    mini_lab: ["GradingCheck3"]

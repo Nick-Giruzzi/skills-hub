@@ -9,10 +9,48 @@ It was referenced in the `config_README.md` file but the Skills Hub Server has b
 
 This is due to the fact that the grading mode is now configured on a per-question basis, and if the developer wants to be able to grade both types then this allows for it. They were separated as well due to the nature of each grading type as we don't want to run the same grading script every time grading occurs whether it be cron or a user submission. So this allows for separation of them.
 
-Like its predecessor, the Challenge Server, the grading script should only print out a string for each task/token that follows the format: `task : status -- optional msg`, where the status is either `Failure` or `Success`, followed by an optional message starting with two hyphens (`--`) if the developer wants to provide feedback to the user.
+The grading script should only print out a string for each task/token that follows the format: `key : status -- optional msg`, where the status is either `Failure` or `Success`, followed by an optional message starting with two hyphens (`--`) if the developer wants to provide feedback to the user.
 <br><br>
 
-### runSSHCommand function
+The `key` should be the part of the you are grading.  
+
+The `status` should be the status of the grading check, `Success` or `Failure`
+
+The ` -- optional msg` should contain any feedback the developer wants to provide feedback to the user.
+
+For all grading response, feedback can be provided to the user by appending the string ` -- ` to the result (success or failure). The characters ` -- ` indicate a comment/feedback and so any message following it will be provided to the user.
+
+For example:
+
+    If the grading for `GradingCheck1` failed and I wanted to return the feedback message `Connection timed out` for that grading check, I would use the following code:
+
+    ```python
+    results['GradingCheck1'] = "Failure -- Connection timed out
+    ```
+
+Examples can be found [in this file](../custom_scripts/manualGradingExample.py)
+
+Your grading script should output one (1)  `key:status` pair per line. Each new line (and therefore each `key:value` pair) will be treated as different parts of a multi-part lab.
+
+Feel free to include as much or as little detail in the message as you'd like the competitor to see. The only requirement is: The word 'success' must be present in the `status` field of any part you want to display a token for.
+
+The Grading Server will use the `keys` output by the grading script to display output to the user.
+
+The Grading Server will also display the `values` output by the grading script to the user. This can help the user figure out why they failed a particular part if useful messages are provided. **Do not include any text in the values that you do not want users to see.**
+
+Your grading script should start with a 'shebang' line which gives the absolute path to the interpreter that should be used to run the program.
+
+- Bash scripts should start with `#!/bin/bash`
+- Python scripts should start with `#!/usr/bin/python3`
+- PowerShell scripts should start with `#!/snap/bin/pwsh`
+
+Your grading script must have the executable bit set. Ensure you run the following command: `chmod +x <your_script>`.
+
+Example grading scripts are [here](./src/custom_scripts/).
+
+## Additional Functionality/Notes
+
+### `manualGradingScript.py` runSSHCommand function
 
 I've added the function `runSSHCommand` at the top of the `manualGradingExample.py` script. This function can be used to execute SSH commands to a remote host.
 
@@ -68,7 +106,7 @@ If you are intending to use this function, There are a few edits that are requir
 
 It is configured to return a dictionary object.
 
-### Manual type (text, button)
+### Manual type (text, button, multiple choice, upload)
 
 If your lab doesn't utilize question sets and/or `phases` and have `phases` disabled in `config.yml`, then the grading script can be created like normal without any special formatting.
 
@@ -158,6 +196,11 @@ if __name__ == '__main__':
 ```
 <br><br>
 
+## Grading Feedback/Response
+
+
+
+
 ## **NOTE**
 
-This server is still being edited, tested, and updated so there may be bugs that appear. 
+The Grading Server will also display the `values` output by the grading script to the user. This can help the user figure out why they failed a particular part if useful messages are provided. **Do not include any text in the values that you do not want users to see.**
