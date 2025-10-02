@@ -25,12 +25,12 @@ def checkLocalPortLoop(interval: int = 30) -> None:
     Logs in a more readable format written to /var/log/open-ports
     '''
 
-    globals.app.logger.info(f"Checking local open ports every {interval} seconds")
+    globals.log("info",f"Checking local open ports every {interval} seconds")
     while True:
         date = datetime.now().strftime("%d/%m/%Y-%H:%M:%S")
         open_ports = checkLocalPorts()
-        stripped = re.sub("\s+", " ", open_ports).replace("\n", "\\n") # removing multiple spaces in a row and newline chars make this nicer for syslog (one line logging)
-        globals.app.logger.info(f"SERVICE/PORT LOGS: Open ports: {stripped}")
+        stripped = re.sub(r"\s+", " ", open_ports).replace("\n", "\\n") 
+        globals.log("info",f"SERVICE/PORT LOGS: Open ports: {stripped}")
 
         with open("/var/log/open-ports", "a") as f:
             f.write(f"""
@@ -49,30 +49,30 @@ def isIPv4(host: str) -> bool:
     If unsuccessful, assumes address is IPv6 
     '''
     if isValidIPv4(host):
-        globals.app.logger.info(f"SERVICE/PORT LOGS: Regex matched {host} as a valid IPv4 address")
+        globals.log("info",f"SERVICE/PORT LOGS: Regex matched {host} as a valid IPv4 address")
         return True
     elif isValidIPv6(host):
-        globals.app.logger.info(f"SERVICE/PORT LOGS: Regex matched {host} as a valid IPv6 address")
+        globals.log("info",f"SERVICE/PORT LOGS: Regex matched {host} as a valid IPv6 address")
         return False
     # If it is not IPv4 or IPv6 here, then we have a FQDN or Hostname and attempt to resolve  
     else:
         try:
             ipAddr = socket.gethostbyname(str(host))    
-            globals.app.logger.info(f"Resolved IPv4 address is {ipAddr}")
+            globals.log("info",f"Resolved IPv4 address is {ipAddr}")
             return True
         except socket.gaierror as e:
             errNum = e.errno
             if errNum == int(-5):
-                globals.app.logger.info(f"SERVICE/PORT LOGS: Treating {host} as an IPv6 address")
+                globals.log("info",f"SERVICE/PORT LOGS: Treating {host} as an IPv6 address")
                 return False
             elif errNum == int(-3):
-                globals.app.logger.error(f"SERVICE/PORT LOGS: Failed to resolve {host} - Check DNS Entry. Assuming IPv4 in the meantime")
+                globals.log("error",f"SERVICE/PORT LOGS: Failed to resolve {host} - Check DNS Entry. Assuming IPv4 in the meantime")
                 return True
             else:
-                globals.app.logger.error(f"SERVICE/PORT LOGS: Socket Error in isIPv4 Function - {e}. Assuming IPv4 in the meantime")
+                globals.log("error",f"SERVICE/PORT LOGS: Socket Error in isIPv4 Function - {e}. Assuming IPv4 in the meantime")
                 return True
         except Exception as e:
-            globals.app.logger.error(f"SERVICE/PORT LOGS: Exception in isIPv4 Function - {e}. Assuming IPv4 in the meantime") 
+            globals.log("error",f"SERVICE/PORT LOGS: Exception in isIPv4 Function - {e}. Assuming IPv4 in the meantime") 
             return True
 
 
@@ -84,8 +84,8 @@ def isValidIPv4(host: str) -> bool:
     Returns False if it does not
     ''' 
     ipv4_re = re.compile(
-    ('((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.)'
-     '{3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])'))
+    (r'((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.)'
+     r'{3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])'))
     return bool(ipv4_re.match(host))
 
 
@@ -108,10 +108,10 @@ def isValidIPv6(host: str) -> bool:
     ':((:[0-9a-fA-F]{1,4}){1,7}|:)|'
     'fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|'
     '::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|'
-    '(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|'
+    r'(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|'
     '(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|'
     '([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|'
-    '(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|'
+    r'(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|'
     '(2[0-4]|1{0,1}[0-9]){0,1}[0-9])'))
     return bool(ipv6_re.match(host))
 
@@ -122,20 +122,20 @@ def checkPing(host: str, count: int = 1) -> bool:
     Returns True if the host can be pinged
     Returns False if the host cannot be pinged
     '''
-    globals.app.logger.info(f"Pinging host {host}")
+    globals.log("info",f"Pinging host {host}")
     try:
         results = subprocess.run(f"ping {host} -W 1 -c {count}", shell=True, capture_output=True)
         exit_code = results.returncode
         stdout_string = " \\n ".join(line.strip() for line in str(results.stdout.decode("UTF-8")).splitlines())
         stderr_string = " \\n ".join(line.strip() for line in str(results.stderr.decode("UTF-8")).splitlines())
-        globals.app.logger.info(f"SERVICE/PORT LOGS: Exit code {exit_code} from pinging {host}")
+        globals.log("info",f"SERVICE/PORT LOGS: Exit code {exit_code} from pinging {host}")
         if exit_code == 0:
-            globals.app.logger.info(f"SERVICE/PORT LOGS: Successful ping to host {host} - {stdout_string}")
+            globals.log("info",f"SERVICE/PORT LOGS: Successful ping to host {host} - {stdout_string}")
             return True
-        globals.app.logger.warning(f"SERVICE/PORT LOGS: Failed to ping host {host} - {stderr_string}")
+        globals.log("warning",f"SERVICE/PORT LOGS: Failed to ping host {host} - {stderr_string}")
         return False
     except Exception as e:
-        globals.app.logger.error(f"SERVICE/PORT LOGS: Failed to ping host {host}. Got exception {str(e)}")
+        globals.log("error",f"SERVICE/PORT LOGS: Failed to ping host {host}. Got exception {str(e)}")
         return False
 
 
@@ -145,21 +145,21 @@ def checkSocket(host: str, port: str|int) -> bool:
     Returns True if socket connection is successful (port is reachable)
     Returns False if socket connection failed (port is not reachable)
     '''
-    globals.app.logger.info(f"SERVICE/PORT LOGS: Attempting to connect to socket {host}:{port}")
+    globals.log("info",f"SERVICE/PORT LOGS: Attempting to connect to socket {host}:{port}")
     success = False
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) if isIPv4(host) else socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         s.settimeout(2)
         s.connect((host, int(port)))
         s.shutdown(socket.SHUT_RDWR)
-        globals.app.logger.info(f"SERVICE/PORT LOGS: Successful connection to socket {host}:{port}")
+        globals.log("info",f"SERVICE/PORT LOGS: Successful connection to socket {host}:{port}")
         success = True 
     except socket.gaierror as e:
-        globals.app.logger.warning(f"SERVICE/PORT LOGS: Failed connection to socket {host}:{port}. Get Address Info (DNS) error prevented socket connection. Exception: {e}")
+        globals.log("warning",f"SERVICE/PORT LOGS: Failed connection to socket {host}:{port}. Get Address Info (DNS) error prevented socket connection. Exception: {e}")
     except TimeoutError as e:
-        globals.app.logger.warning(f"SERVICE/PORT LOGS: Failed connection to socket {host}:{port}. Connection timeout.")
+        globals.log("warning",f"SERVICE/PORT LOGS: Failed connection to socket {host}:{port}. Connection timeout.")
     except Exception as e:
-        globals.app.logger.error(f"SERVICE/PORT LOGS: Failed connection to connect to socket {host}:{port}. Exception {e}")
+        globals.log("error",f"SERVICE/PORT LOGS: Failed connection to connect to socket {host}:{port}. Exception {e}")
     finally:
         s.close()
     return success
@@ -172,30 +172,30 @@ def checkWeb(host: str, port: int|str = 80, path: str = '/') -> bool:
     Returns False if the web request returns anything but a 200
     If host is an IP address, IP version is checked as IPv6 requires [ ] brackets 
     '''
-    fqdn = re.compile('(?=^.{4,253}$)(^((?!-)[a-zA-Z0-9-]{1,63}(?<!-)\.)+[a-zA-Z]{2,63}\.?$)')
+    fqdn = re.compile(r'(?=^.{4,253}$)(^((?!-)[a-zA-Z0-9-]{1,63}(?<!-)\.)+[a-zA-Z]{2,63}\.?$)')
     if fqdn.search(host): # Check if host is FQDN. If True, IP version does not matter 
         url = f"http://{host}:{port}{path}"
-        globals.app.logger.info("SERVICE/PORT LOGS: checkWeb is using FQDN")
+        globals.log("info","SERVICE/PORT LOGS: checkWeb is using FQDN")
     elif isIPv4(host) == True: 
         url = f"http://{host}:{port}{path}"
-        globals.app.logger.info("SERVICE/PORT LOGS: checkWeb is using IPv4")
+        globals.log("info","SERVICE/PORT LOGS: checkWeb is using IPv4")
     else:
         url = f"http://[{host}]:{port}{path}" 
-        globals.app.logger.info("SERVICE/PORT LOGS: checkWeb is using IPv6")
-    globals.app.logger.info(f"SERVICE/PORT LOGS: Attempting to reach {url}")
+        globals.log("info","SERVICE/PORT LOGS: checkWeb is using IPv6")
+    globals.log("info",f"SERVICE/PORT LOGS: Attempting to reach {url}")
     try:
         result = requests.get(url=url)
-        globals.app.logger.info(f"SERVICE/PORT LOGS: Web request returned {result.status_code}")
-        globals.app.logger.debug(f"SERVICE/PORT LOGS: Web request returned {result.status_code}: {result.content}")
+        globals.log("info",f"SERVICE/PORT LOGS: Web request returned {result.status_code}")
+        globals.log("debug",f"SERVICE/PORT LOGS: Web request returned {result.status_code}: {result.content}")
         return result.status_code == 200
     except requests.exceptions.Timeout as e:
-        globals.app.logger.warning(f"SERVICE/PORT LOGS: Failed connection to {url}. Connection Timeout Exception: {e}")
+        globals.log("warning",f"SERVICE/PORT LOGS: Failed connection to {url}. Connection Timeout Exception: {e}")
     except requests.exceptions.InvalidURL as e:
-        globals.app.logger.warning(f"SERVICE/PORT LOGS: Failed connection to {url}. Invalid URL Exception: {e}")
+        globals.log("warning",f"SERVICE/PORT LOGS: Failed connection to {url}. Invalid URL Exception: {e}")
     except requests.exceptions.ConnectionError as e:
-        globals.app.logger.warning(f"SERVICE/PORT LOGS: Failed connection to {url}. Connection Error: {e}")
+        globals.log("warning",f"SERVICE/PORT LOGS: Failed connection to {url}. Connection Error: {e}")
     except Exception as e:
-        globals.app.logger.error(f"SERVICE/PORT LOGS: Failed connection to {url}. Got Exception: {e}")
+        globals.log("error",f"SERVICE/PORT LOGS: Failed connection to {url}. Got Exception: {e}")
     return False
 
 
@@ -206,7 +206,7 @@ def checkService(service:dict) -> bool:
     Returns False is the service is unreachable. 
     '''
 
-    globals.app.logger.info(f"SERVICE/PORT LOGS: Checking availability of service: {service}")
+    globals.log("info",f"SERVICE/PORT LOGS: Checking availability of service: {service}")
     reachable = False
     service_type = service['type']
     if service_type == 'ping':
@@ -217,10 +217,10 @@ def checkService(service:dict) -> bool:
         reachable = checkWeb(service['host'], service['port'], service['path'])
     
     if reachable:
-        globals.app.logger.info(f"SERVICE/PORT LOGS: Service available: {service}")
+        globals.log("info",f"SERVICE/PORT LOGS: Service available: {service}")
         return True
     else:
-        globals.app.logger.error(f"SERVICE/PORT LOGS: Service unavailable: {service}")
+        globals.log("error",f"SERVICE/PORT LOGS: Service unavailable: {service}")
         return False
 
 
@@ -235,12 +235,12 @@ def waitForService(service:dict, interval: int = 2, max_attempts: int = 0):
     attempts = 0
     while True:
         attempts += 1
-        globals.app.logger.info(f"SERVICE/PORT LOGS: Waiting for service to become available (attempt number {attempts}): {service}")
+        globals.log("info",f"SERVICE/PORT LOGS: Waiting for service to become available (attempt number {attempts}): {service}")
         service_available = checkService(service)
         if service_available:
             return service_available
         if max_attempts and attempts == max_attempts:
-            globals.app.logger.error(f"SERVICE/PORT LOGS: Service unavailable after max attempts ({attempts}): {service}")
+            globals.log("error",f"SERVICE/PORT LOGS: Service unavailable after max attempts ({attempts}): {service}")
             return False
         sleep(interval)
 
@@ -250,14 +250,14 @@ def checkServiceLoop(service:dict, interval: int = 30, max_checks: int = 0) -> b
     Checks the availability of the service forever in a loop (or until max_checks is reached). Default time between checks is 30s. 
     '''
 
-    globals.app.logger.info(f"SERVICE/PORT LOGS: Checking service {service} every {interval} seconds")
+    globals.log("info",f"SERVICE/PORT LOGS: Checking service {service} every {interval} seconds")
     attempts = 0
     while True:
         attempts += 1
-        globals.app.logger.info(f"SERVICE/PORT LOGS: Service check number {attempts} for {service}")
+        globals.log("info",f"SERVICE/PORT LOGS: Service check number {attempts} for {service}")
         checkService(service)
         if max_checks and attempts == max_checks:
-            globals.app.logger.warning(f"SERVICE/PORT LOGS: Reached the maximum number of service checks ({max_checks}).. Will no longer check on service {service}.")
+            globals.log("warning",f"SERVICE/PORT LOGS: Reached the maximum number of service checks ({max_checks}).. Will no longer check on service {service}.")
             return True
         sleep(interval)
 
@@ -274,26 +274,26 @@ def get_logs(service: dict) -> None:
             get_status_cmd = f"sshpass -p {service['password']} ssh -o StrictHostKeyChecking=no {service['user']}@{service['host']} 'systemctl is-active {service['service']}'"
             status_response = subprocess.run(get_status_cmd, shell=True,capture_output=True, timeout=10)
         except subprocess.TimeoutExpired:
-            globals.app.logger.warning(f"SERVICE/PORT LOGS: request to host timed out.")
+            globals.log("warning",f"SERVICE/PORT LOGS: request to host timed out.")
             globals.services_status[service['service']] = [service['host'],f"request to host timed out. Trying again shortly"]
             continue
         except Exception as e:
-            globals.app.logger.error(f"SERVICE/PORT LOGS: Exception has occurred when attempting to retrieve service status.")
-            globals.app.logger.error(f"SERVICE/PORT LOGS: Exception: {e}")
+            globals.log("error",f"SERVICE/PORT LOGS: Exception has occurred when attempting to retrieve service status.")
+            globals.log("error",f"SERVICE/PORT LOGS: Exception: {e}")
             globals.services_status[service['service']] = [service['host'],f"Exception has occurred when attempting to retrieve service status."]
             continue
         if status_response.stdout.decode('utf-8') == '':
-            globals.app.logger.error(f"SERVICE/PORT LOGS: Error has occurred when attempting to get service status.")
-            globals.app.logger.error(f"SERVICE/PORT LOGS: {status_response.stderr.decode('utf-8')}")
+            globals.log("error",f"SERVICE/PORT LOGS: Error has occurred when attempting to get service status.")
+            globals.log("error",f"SERVICE/PORT LOGS: {status_response.stderr.decode('utf-8')}")
             globals.services_status[service['service']] = [service['host'],f"Error has occurred when attempting to get service status."]
             continue
         if status_response.stdout.decode('utf-8').strip('\n') == 'failed':
             er = "SERVICE FAILED: "
-            globals.app.logger.error(f"SERVICE/PORT LOGS: {er} {service['service']} is in failed state.")
+            globals.log("error",f"SERVICE/PORT LOGS: {er} {service['service']} is in failed state.")
             globals.services_status[service['service']] = [service['host'],f"Service is in failed state."]
         elif status_response.stdout.decode('utf-8').strip('\n') == 'inactive':
             er = "SERVICE INACTIVE: "
-            globals.app.logger.error(f"SERVICE/PORT LOGS: {er} {service['service']} is in inactive state.")
+            globals.log("error",f"SERVICE/PORT LOGS: {er} {service['service']} is in inactive state.")
             globals.services_status[service['service']] = [service['host'],f"Service is in inactive state."]
         else:
             globals.services_status[service['service']] = [service['host'],f"Service is in active state."]
@@ -303,28 +303,28 @@ def get_logs(service: dict) -> None:
             log_response = subprocess.run(get_log_cmd, shell=True,capture_output=True,timeout=10)
             cur_logs = log_response.stdout.decode('utf-8')
         except subprocess.TimeoutExpired:
-            globals.app.logger.error(f"SERVICE/PORT LOGS: SSH connection to host timed out.")
+            globals.log("error",f"SERVICE/PORT LOGS: SSH connection to host timed out.")
             continue
         except Exception as e:
-            globals.app.logger.error(f"SERVICE/PORT LOGS: Exception has occurred when attempting to retrieve logs.")
-            globals.app.logger.error(f"SERVICE/PORT LOGS: Exception: {e}")
+            globals.log("error",f"SERVICE/PORT LOGS: Exception has occurred when attempting to retrieve logs.")
+            globals.log("error",f"SERVICE/PORT LOGS: Exception: {e}")
             continue
         if log_response.stdout.decode('utf-8') == '':
-            globals.app.logger.error(f"SERVICE/PORT LOGS: Error has occurred when attempting to collect logs.")
-            globals.app.logger.error(f"SERVICE/PORT LOGS: Error: {log_response.stderr.decode('utf-8')}")
+            globals.log("error",f"SERVICE/PORT LOGS: Error has occurred when attempting to collect logs.")
+            globals.log("error",f"SERVICE/PORT LOGS: Error: {log_response.stderr.decode('utf-8')}")
             continue
         if "No entries" in cur_logs:
             if er != False:
-                globals.app.logger.error(f"SERVICE/PORT LOGS: {er} No new logs fe.")
+                globals.log("error",f"SERVICE/PORT LOGS: {er} No new logs fe.")
             else:
-                globals.app.logger.info(f"SERVICE/PORT LOGS: No new logs found at this time.")
+                globals.log("info",f"SERVICE/PORT LOGS: No new logs found at this time.")
             continue
         output = cur_logs.split("\n")
         output.remove("")
         for line in output:
             if er == False:
-                globals.app.logger.info(f"SERVICE/PORT LOGS: {line}")
+                globals.log("info",f"SERVICE/PORT LOGS: {line}")
             else:
-                globals.app.logger.error("SERVICE/PORT LOGS: "+ er + line)
+                globals.log("error","SERVICE/PORT LOGS: "+ er + line)
         log_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 

@@ -95,7 +95,7 @@ def check_db(label: str) -> bool:
     with globals.app.app_context():
         cur_question = QuestionTracking.query.filter_by(label=label).first()
         if cur_question == None:
-            globals.app.logger.error("No entry found in DB while attempting to mark question completed. Exiting")
+            globals.log("error","No entry found in DB while attempting to mark question completed. Exiting")
             sys.exit(1) 
         return cur_question.solved
 
@@ -106,8 +106,8 @@ def update_db(type_q: str,label: str = None, val: str = None) -> Any:
             try:
                 cur_question = QuestionTracking.query.filter_by(label=label).first()
                 if cur_question == None:
-                    globals.app.logger.error("No entry found in DB while attempting to mark question completed. Exiting")
-                    globals.app.logger.error("---- NOTE: IF PREVIOUSLY WORKED, ERROR LIKELY CAUSED BY EXTRA TEXT BEING PRINTED FROM GRADING SCRIPT.")
+                    globals.log("error","No entry found in DB while attempting to mark question completed. Exiting")
+                    globals.log("error","---- NOTE: IF PREVIOUSLY WORKED, ERROR LIKELY CAUSED BY EXTRA TEXT BEING PRINTED FROM GRADING SCRIPT.")
                     sys.exit(1) 
                 if (val != None) and ('--' in val):
                     cur_question.response = val.split('--',1)[1]
@@ -116,17 +116,16 @@ def update_db(type_q: str,label: str = None, val: str = None) -> Any:
                 if "success" in val.lower():
                     cur_question.solved = True
                     cur_question.time_solved = datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+                    globals.log("info",f"Question {cur_question.label} marked completed in DB.")
                 db.session.commit()
             except Exception as e:
-                globals.app.logger.error(f"Exception occurred while update DB with completed question. Exception: {e}. Exiting.")
+                globals.log("error",f"Exception occurred while update DB with completed question. Exception: {e}. Exiting.")
                 sys.exit(1)
-            globals.app.logger.info(f"Question {cur_question.label} marked completed in DB.")
-            
         else:
             for p in globals.phase_order:
                 phase = PhaseTracking.query.filter_by(label=p).first()
                 if phase == None:
-                    globals.app.logger.error("No entry found in DB while attempting to find current phase during DB update. Exiting")
+                    globals.log("error","No entry found in DB while attempting to find current phase during DB update. Exiting")
                     sys.exit(1) 
                 if phase.solved == False:
                     q_list = phase.tasks.split(',')
@@ -134,7 +133,7 @@ def update_db(type_q: str,label: str = None, val: str = None) -> Any:
                     for q in q_list:
                         cur_q = QuestionTracking.query.filter_by(label=q).first()
                         if cur_q == None:
-                            globals.app.logger.error("No entry found in DB while attempting to update phase DB. Exiting")
+                            globals.log("error","No entry found in DB while attempting to update phase DB. Exiting")
                             sys.exit(1) 
                         if cur_q.solved == True:
                             num_q -= 1
@@ -154,7 +153,7 @@ def get_current_phase() -> str:
         for phase in globals.phase_order:
             cur_phase = PhaseTracking.query.filter_by(label=phase).first()
             if cur_phase == None:
-                globals.app.logger.warning(f"Attempted query of current phase and no record found for phase {phase}. Lab likely booting for first time.")
+                globals.log("warning",f"Attempted query of current phase and no record found for phase {phase}. Lab likely booting for first time.")
                 raise KeyError
             if cur_phase.solved == False:
                 globals.current_phase = cur_phase.label

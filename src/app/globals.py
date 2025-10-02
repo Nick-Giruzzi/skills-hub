@@ -47,6 +47,7 @@ class Globals():
         self.info_home_enabled: bool = False
         self.services_home_enabled: bool = False
         self.accessible_enabled: bool = False
+        self.local_logging: bool = False
 
         # Configuration globals
         self.conf: dict = {}
@@ -268,6 +269,7 @@ class Globals():
         self.startup_workspace = conf.get('startup', {}).get('runInWorkspace',False)
         self.lab_name = self.resolve(conf.get('lab_name'), "")
         self.port_checker = self.resolve_bool(conf.get('port_checker'), False)
+        self.local_logging = conf.get('local_logging',False)
         self.grading_enabled = self.resolve_bool(conf.get('grading').get('enabled'), False)
         if (self.grading_enabled) and (conf.get('grading').get('manual_grading', False)):
             self.manual_grading_script = self.resolve(conf.get('grading').get('manual_grading_script'))
@@ -309,7 +311,6 @@ class Globals():
                 exit(1)
         self.required_services = conf.get('required_services', [])
         if (self.required_services == []) or (self.required_services == None):
-            ...
             app.logger.info("No required services configured.")
         else:
             for service in self.required_services:
@@ -371,3 +372,7 @@ class Globals():
         if (self.hosted_files_enabled) and (len(os.listdir(self.challenge_files)) != 0):
             if 'challenge' not in os.listdir(self.hosted_file_directory):
                 os.system(f'cp -r {self.challenge_files} {self.hosted_file_directory}')
+
+    def log(self, level, msg) -> None:
+        log_method = getattr(self.app.logger, level.lower())
+        log_method(msg)

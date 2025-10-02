@@ -9,8 +9,6 @@ from app.databaseHelpers import check_db, get_current_phase, record_solves, upda
 from app.extensions import db, globals
 #from app.fileUploads import get_most_recent_file
 from app.models import EventTracker
-from flask import current_app
-
 
 ####### 
 # functions to be used during grading process
@@ -25,7 +23,8 @@ def do_grade(args: dict) -> tuple[dict,dict]:
     manual_grading_list = list()
     for ques,ans in args.items():
         if (ques not in globals.grading_parts.keys()) or (globals.grading_parts[ques]['mode'] not in globals.VALID_CONFIG_MODES):
-            globals.app.logger.debug(f"The key {ques} is not a valid grading aspect or valid part of question configuration. Skipping")
+            #globals.log("debug",f"The key {ques} is not a valid grading aspect or valid part of question configuration. Skipping")
+            globals.log('debug',f"The key {ques} is not a valid grading aspect or valid part of question configuration. Skipping")
             continue
         if (globals.grading_parts[ques]['mode'] in globals.MANUAL_MODE) and (globals.grading_parts[ques]['mode'] != "button"):
             index = int(ques[-1]) 
@@ -49,14 +48,17 @@ def do_grade(args: dict) -> tuple[dict,dict]:
             
     try:
         out = subprocess.run(grade_cmd, capture_output=True, check=True)
-        globals.app.logger.info(f"Grading process finished: {out}")
+        #globals.log("info",f"Grading process finished: {out}")
+        globals.log('info',f"Grading process finished: {out}")
         output = out.stdout.decode('utf-8')
         if (output == "") or (output == None):
-            globals.app.logger.error("Grading script finished without returning any output.")
+            #globals.log("error","Grading script finished without returning any output.")
+            globals.log('error',"Grading script finished without returning any output.")
             globals.fatal_error = True
     # Something happened if there was a non-zero exit status. Log this and set fatal_error
     except subprocess.CalledProcessError as e:
-        globals.app.logger.error(f"Grading script {globals.manual_grading_script} returned with non-zero exit status {e.returncode}.\tStdout: {e.stdout}\tStderr: {e.stderr}")
+        #globals.log("error",f"Grading script {globals.manual_grading_script} returned with non-zero exit status {e.returncode}.\tStdout: {e.stdout}\tStderr: {e.stderr}")
+        globals.log('error',f"Grading script {globals.manual_grading_script} returned with non-zero exit status {e.returncode}.\tStdout: {e.stdout}\tStderr: {e.stderr}")
         globals.fatal_error = True
         output = ""
 
@@ -66,7 +68,7 @@ def do_grade(args: dict) -> tuple[dict,dict]:
             results.append(map(str.strip, sub.split(':', 1)))
     results = dict(results)             
 
-    with current_app.app_context():
+    with globals.app.app_context():
         event_data = {
             "lab":globals.lab_name,
             "support_code":globals.support_code,
@@ -85,7 +87,8 @@ def do_grade(args: dict) -> tuple[dict,dict]:
         ## IMPORTANT -- Below should only occur if phases are not configured. I believe below code provides grade for ungraded questions, where we dont want that if phase has not been reached
         if not globals.phases_enabled:
             if grading_key not in results:
-                globals.app.logger.info(f"Grading script, {globals.manual_grading_script}, did not yield a result for grading part {grading_key}. Assigning value of 'Failed'")
+                #globals.log("info",f"Grading script, {globals.manual_grading_script}, did not yield a result for grading part {grading_key}. Assigning value of 'Failed'")
+                globals.log('info',f"Grading script, {globals.manual_grading_script}, did not yield a result for grading part {grading_key}. Assigning value of 'Failed'")
                 results[grading_key] = "Failed"
 
     for k,v in results.items():
@@ -100,7 +103,8 @@ def get_results(results: dict) -> tuple[dict,dict]:
     tokens = {}
     for key, value in results.items():
         if key not in globals.grading_parts.keys():
-            globals.app.logger.debug(f"Found key in results that is not a grading part. Removing {key} from results dict. ")
+            #globals.log("debug",f"Found key in results that is not a grading part. Removing {key} from results dict. ")
+            globals.log('debug',f"Found key in results that is not a grading part. Removing {key} from results dict. ")
             del end_results[key]
         if "success" in value.lower():
             tokens[key] = read_token(key)
@@ -112,8 +116,10 @@ def get_results(results: dict) -> tuple[dict,dict]:
             tokens[key] = "You did not earn a token for this part"
     if globals.phases_enabled == True:
         update_db('p')
-    globals.app.logger.info(f"Grading Results: {end_results}")
-    globals.app.logger.info(f"Grading tokens: {tokens}")
+    #globals.log("info",f"Grading Results: {end_results}")
+    #globals.log("info",f"Grading tokens: {tokens}")
+    globals.log('info',f"Grading Results: {end_results}")
+    globals.log('info',f"Grading tokens: {tokens}")
     return end_results, tokens
 
 
@@ -143,35 +149,44 @@ def post_submission(tokens: dict) -> Any:
     ## log error if still failure after 4 tries
     attempts = 0
     while attempts < 4:
-        globals.app.logger.debug(f"Attempting {globals.grading_verb} submission to URL: {globals.grader_url}\tHeaders: {headers}\tPayload: {payload}")
+        #globals.log("debug",f"Attempting {globals.grading_verb} submission to URL: {globals.grader_url}\tHeaders: {headers}\tPayload: {payload}")
+        globals.log('debug',f"Attempting {globals.grading_verb} submission to URL: {globals.grader_url}\tHeaders: {headers}\tPayload: {payload}")
         attempts = attempts + 1
         try: 
             if globals.grading_verb == "POST":
                 r = requests.post(globals.grader_url, data=payload, headers=headers)
                 if r.status_code == 200:
-                    globals.app.logger.debug(f"Got 200 from {globals.grader_url} after POST")
+                    #globals.log("debug",f"Got 200 from {globals.grader_url} after POST")
+                    globals.log('debug',f"Got 200 from {globals.grader_url} after POST")
                     globals.fatal_error = False
                     return
                 elif r.status_code == 405:
-                    globals.app.logger.debug(f"Got 405 from {globals.grader_url} after POST. Changing to PUT.")
+                    #globals.log("debug",f"Got 405 from {globals.grader_url} after POST. Changing to PUT.")
+                    globals.log('debug',f"Got 405 from {globals.grader_url} after POST. Changing to PUT.")
                     globals.grading_verb = "POST"
                 else:
-                    globals.app.logger.error(f"Got {r.status_code} from {globals.grader_url} attempting to POST. Message: {r.content}")
+                    #globals.log("error",f"Got {r.status_code} from {globals.grader_url} attempting to POST. Message: {r.content}")
+                    globals.log('error',f"Got {r.status_code} from {globals.grader_url} attempting to POST. Message: {r.content}")
             if globals.grading_verb == "PUT":
                 r = requests.put(globals.grader_url, data=payload, headers=headers)
                 if r.status_code == 200:
-                    globals.app.logger.debug(f"Got 200 from {globals.grader_url} after PUT")
+                    #globals.log("debug",f"Got 200 from {globals.grader_url} after PUT")
+                    globals.log('debug',f"Got 200 from {globals.grader_url} after PUT")
                     globals.fatal_error = False
                     return
                 else:
-                    globals.app.logger.error(f"Got {r.status_code} from {globals.grader_url} attempting to PUT. Message: {r.content}")
+                    #globals.log("error",f"Got {r.status_code} from {globals.grader_url} attempting to PUT. Message: {r.content}")
+                    globals.log('error',f"Got {r.status_code} from {globals.grader_url} attempting to PUT. Message: {r.content}")
         except Exception as e:
-            globals.app.logger.error(f"Got exception {e} while trying to PUT/POST data to {globals.grader_url}")
+            #globals.log("error",f"Got exception {e} while trying to PUT/POST data to {globals.grader_url}")
+            globals.log('error',f"Got exception {e} while trying to PUT/POST data to {globals.grader_url}")
         
         sleep(1)
-        globals.app.logger.info("Trying grader submission again after failure on previous attempt.")
+        #globals.log("info","Trying grader submission again after failure on previous attempt.")
+        globals.log('info',"Trying grader submission again after failure on previous attempt.")
 
-    globals.app.logger.error(f"All attempts to submit results to grader failed.\tURL: {globals.grader_url}\tVerb: {globals.grading_verb}\tHeaders: {headers}\tPayload: {payload}")
+    #globals.log("error",f"All attempts to submit results to grader failed.\tURL: {globals.grader_url}\tVerb: {globals.grading_verb}\tHeaders: {headers}\tPayload: {payload}")
+    globals.log('error',f"All attempts to submit results to grader failed.\tURL: {globals.grader_url}\tVerb: {globals.grading_verb}\tHeaders: {headers}\tPayload: {payload}")
     globals.fatal_error = True
 
 
@@ -184,8 +199,10 @@ def done_grading(future: Future) -> None:
     with globals.app.app_context():
         results, tokens = future.result()
 
-        globals.app.logger.info(f"Server sees {globals.manual_grading_script} results as: {results}")
-        globals.app.logger.info(f"Server sees tokens as: {tokens}")
+        #globals.log("info",f"Server sees {globals.manual_grading_script} results as: {results}")
+        globals.log('info', f"Server sees {globals.manual_grading_script} results as: {results}")
+        #globals.log("info",f"Server sees tokens as: {tokens}")
+        globals.log('info', f"Server sees tokens as: {tokens}")
 
         # save results and tokens so they can be accessed globally
         globals.manual_results
@@ -205,7 +222,8 @@ def read_token(part_name: str) -> str:
     try:
         value = globals.grading_parts[part_name]['token_name']
     except KeyError:
-        globals.app.logger.error(f"There is no match for {part_name} in the config file. Valid part names from config file are: {globals.grading_parts.keys()}")
+        #globals.log("error",f"There is no match for {part_name} in the config file. Valid part names from config file are: {globals.grading_parts.keys()}")
+        globals.log("error",f"There is no match for {part_name} in the config file. Valid part names from config file are: {globals.grading_parts.keys()}")
         if globals.grader_post:
             globals.fatal_error = True
         return "Unexpected error encountered. Contact an administrator."
@@ -215,13 +233,15 @@ def read_token(part_name: str) -> str:
         try: 
             output = subprocess.run(f"vmtoolsd --cmd 'info-get guestinfo.{value}'", shell=True, capture_output=True)
             if 'no value' in output.stderr.decode('utf-8').lower():
-                globals.app.logger.error(f"No value found when querying guestinfo variables for guestinfo.{value}")
+                #globals.log("error",f"No value found when querying guestinfo variables for guestinfo.{value}")
+                globals.log("error",f"No value found when querying guestinfo variables for guestinfo.{value}")
                 if globals.grader_post:
                     globals.fatal_error = True
                 return "Unexpected error encountered. Contact an administrator."
             return output.stdout.decode('utf-8').strip()
         except:
-            globals.app.logger.error("unable to get token from guestinfo vars")
+            #globals.log("error","unable to get token from guestinfo vars")
+            globals.log("error","unable to get token from guestinfo vars")
             if globals.grader_post:
                 globals.fatal_error = True
             return "Unexpected error encountered. Contact an administrator."
@@ -230,10 +250,9 @@ def read_token(part_name: str) -> str:
     else:
         try:
             return globals.static_tokens[part_name]
-            #with open(value, 'r') as f:
-                #return f.readline()
         except Exception as e:
-            globals.app.logger.error(f"Error returning token for check {part_name}")
+            #globals.log("error",f"Error returning token for check {part_name}")
+            globals.log("error",f"Error returning token for check {part_name}")
             if globals.grader_post:
                 globals.fatal_error = True
             return "Unexpected error encountered. Contact an administrator."

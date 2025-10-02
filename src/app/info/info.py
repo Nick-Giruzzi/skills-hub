@@ -46,7 +46,7 @@ def settings():
 def change_mode():
     globals.accessible_enabled = not globals.accessible_enabled
     return make_response(jsonify({"redirect_url":request.referrer}), 200)
-    #return redirect(request.referrer)
+    
 
 
 @info.route('/report', methods=['GET'])
@@ -82,11 +82,12 @@ def report():
         response.headers['Content-Type'] = 'text/csv'
         response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
         
+        globals.log("info","User report generated")
         return response
         
     except Exception as e:
         # Log the error (you might want to use proper logging)
-        print(f"Error generating report: {str(e)}")
+        globals.log("error",f"Error generating report: {str(e)}")
         
         # Return error response
         return make_response("Error generating report", 500)
@@ -94,6 +95,6 @@ def report():
 
 @info.route("restart",methods=['GET'])
 def restart():
-    current_app.logger.info("***WEBSITE RESTART TRIGGERED***")
+    globals.log("info","Systemd website restart triggered.")
     subprocess.run("sudo systemctl restart skillsHub.service",shell=True)
     return make_response(jsonify({"redirect_url":'https://skills.hub/lab'}), 200)

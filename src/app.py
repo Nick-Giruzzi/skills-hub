@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, random, threading, os, signal, sys, argparse, logging
+import sys, random, threading, os, signal, sys, argparse, logging, time, signal
 from flask_executor import Executor
 from flask_cors import CORS
 from concurrent.futures import ThreadPoolExecutor
@@ -16,6 +16,10 @@ from app.loggingConfig import setup_logging
 # Create flask app obj
 app = create_app()
 if __name__ == '__main__':
+    if os.geteuid() != 0:
+        globals.log("error","Program must be ran by root.")
+        sys.exit(1)
+
     '''
     This code will start the threads and handle running all aspect of the server
     '''
@@ -26,22 +30,17 @@ if __name__ == '__main__':
                         default="INFO")
     args = parser.parse_args()
 
-    if os.geteuid() != 0:
-        app.logger.error("Program must be ran by root.")
-        sys.exit(1)
-        
     CORS(app)
     globals.executor = Executor(app)
     globals.executor.add_default_done_callback(done_grading)
-    
-    # Read the configuration
-    app.logger.info(f"Skills Hub starting up")
-    app.logger.debug("Skills Hub Operating in a Workspace" if globals.in_workspace else "Skills Hub Operating in a Gamespace")
-    #read_config(app)
 
     Globals.from_yaml(globals, app)
 
     setup_logging(app)
+
+    globals.log("info",f"Skills Hub starting up")
+    globals.log("debug","Skills Hub Operating in a Workspace" if globals.in_workspace else "Skills Hub Operating in a Gamespace")
+
 
     initialize_db(app, globals.conf)
 
@@ -50,24 +49,26 @@ if __name__ == '__main__':
     grading_server_thread.start()
     
     # wait for blocking services to come up
-    app.logger.info(f"Waiting for blocking services to become available")
+    globals.log("info",f"Waiting for blocking services to become available")
     globals.blocking_threadpool.map(waitForService, globals.blocking_services)
     globals.blocking_threadpool.shutdown(wait=True)
-    app.logger.info(f"All blocking services are available")
+    globals.log("info",f"All blocking services are available")
 
     # run startup scripts
     successes, errors = run_startup_scripts(app)
     if errors:
-        app.logger.error(f"Startup scripts exited with error(s): {list(errors.keys())}")
+        globals.log("error",f"Startup scripts exited with error(s): {list(errors.keys())}")
+        os.kill(os.getpid(), signal.SIGINT)
+        time.sleep(0.5)
         sys.exit(1)
     if successes: 
-        app.logger.info(f"All startup scripts exited normally: {list(successes.keys())}")
+        globals.log("info",f"All startup scripts exited normally: {list(successes.keys())}")
 
     globals.server_ready = True # mark server as ready after startup scripts finish
 
     # run a thread that will periodically check on all required services
     if (globals.required_services != []) and (globals.required_services != None):
-        app.logger.info("Starting check on required services.")
+        globals.log("info","Starting check on required services.")
         service_check_pool = ThreadPoolExecutor(thread_name_prefix="ServiceCheck")
         service_check_pool.map(checkServiceLoop, globals.required_services)
 

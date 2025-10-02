@@ -57,6 +57,8 @@ info_and_services:
   #  password: tartans
   #  service: update.service
 
+local_logging: true
+
 grading:
   enabled: true
   grader_post: false

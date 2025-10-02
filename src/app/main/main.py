@@ -57,7 +57,7 @@ def grade():
         return redirect(url_for('main.results'))
 
     if not globals.server_ready:
-        current_app.logger.debug("Tried to perform grading before server was marked as ready.")
+        globals.log("debug","Tried to perform grading before server was marked as ready.")
         return redirect(url_for("info.main"))
 
     # if there is no current grading task, then create one
@@ -69,11 +69,11 @@ def grade():
         # rate limiting grading attempts - display graded and let user know how long to wait
         if submit_time_time + globals.grading_rateLimit > now_time:
             try_again = (globals.grading_rateLimit - (now_time - submit_time_time)).total_seconds().__int__()
-            current_app.logger.info(f"Hit rate limit. Telling user to try again in {try_again} seconds")
+            globals.log("info",f"Hit rate limit. Telling user to try again in {try_again} seconds")
             return redirect(url_for("main.tasks"))
         
         globals.manual_submit_time = now_string
-        current_app.logger.info(f"Submitting a grading task at {globals.manual_submit_time}")
+        globals.log("info",f"Submitting a grading task at {globals.manual_submit_time}")
         if request.method == "GET":
             # GET requests should call do_grade without any arguments
             globals.task = globals.executor.submit(do_grade)
@@ -92,14 +92,14 @@ def grade():
         # globals.results, globals.tokens = task.result()
         globals.task = None
         #if globals.submission_method == 'display':
-        current_app.logger.debug(f"Rendering graded results html page for user. Fatal error is {globals.fatal_error}")
+        globals.log("debug",f"Rendering graded results html page for user. Fatal error is {globals.fatal_error}")
         return redirect(url_for('main.results'))
         #else:
         #    return render_template("auto_submit.html", submit_time=globals.manual_submit_time)
     
     # if the current grading task is still running, show the grading page with the last submit time
     if globals.task.running():
-        current_app.logger.debug("Grading task is still running")
+        globals.log("debug","Grading task is still running")
         return render_template('grading.html', submit_time=globals.manual_submit_time)
 
 @main.route('/results',methods=['GET'])
@@ -139,7 +139,7 @@ def fetch_results(app):
                         #break
                 except Exception as e:
                     break_loop = True
-                    current_app.logger.info(f"Exception occurred during query of results (may be due to attempting to see results before grading). Exception: {str(e)}")
+                    globals.log("info",f"Exception occurred during query of results (may be due to attempting to see results before grading). Exception: {str(e)}")
                 if break_loop:
                     break
             if "01/01/1900" in globals.manual_submit_time:
@@ -207,7 +207,7 @@ def updated_results():
 def list_files(folder):
     if globals.hosted_files_enabled:
         if not globals.server_ready:
-            current_app.logger.info("Tried to view files before server was marked as ready.")
+            globals.log("info","Tried to view files before server was marked as ready.")
             return redirect(url_for("main.home"))
         files = {}
         dirs = {}
@@ -231,10 +231,10 @@ def get_file(path):
             return redirect(url_for('main.list_files'))
         filePath = os.path.join(globals.hosted_file_directory, path)
         if not globals.server_ready:
-            current_app.logger.debug("Tried to download files before server was marked as ready.")
+            globals.log("debug","Tried to download files before server was marked as ready.")
             return redirect(url_for("main.home"))
         if os.path.isfile(filePath) :
-            current_app.logger.debug(f"User is downloading file {filePath}")
+            globals.log("debug",f"User is downloading file {filePath}")
             return send_from_directory(globals.hosted_file_directory,path,as_attachment=True)
         else:
             flash("That file does not exist.")

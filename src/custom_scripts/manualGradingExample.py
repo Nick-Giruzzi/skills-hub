@@ -98,9 +98,8 @@ def execute_in_docker(file_name=None, docker_image=None, libs=False, lib_folder=
         #print(f"Unknown exception occurred: {str(e)}")
         return {"error":f"Exception occurred: {str(e)}"}
 
-def phase1(sub=None):
+def phase1(sub=dict):
     results = dict()
-    print(sub)
     if sub['GradingCheck1'] == 'b':      # This is just an example that checks if the data passed (if any) passes the required condition to pass the grading check
         results['GradingCheck1'] = "Success -- Correct option chosen"
     else:
@@ -108,14 +107,14 @@ def phase1(sub=None):
     return results
 
 
-def phase2(sub=None):
+def phase2(sub=dict):
     results = dict()
     fileName = sub['GradingCheck2']
-    results['GradingCheck2'] = f"Failure"
+    results['GradingCheck2'] = f"Failure -- Wrong answer"
     return results
     
 
-def phase3(sub=None):
+def phase3(sub=dict):
     results = dict()
     results['GradingCheck3'] = "Failure"
     return results
@@ -127,16 +126,28 @@ if __name__ == '__main__':
     args = sys.argv[1:]
     if len(args) > 0:
         passed_phase = args[-1].strip().lower()
-        submissions = json.loads(args[0])
-        res = None
-        if passed_phase == 'phase1':
-            res = phase1(submissions)
-        elif passed_phase == 'phase2':
-            res = phase2(submissions)
+        if passed_phase in phases:
+            ## This code will execute IF phases is enabled & current phase was passed to script.
+            args.pop(-1)
+            if len(args) != 0:
+                ## This code executes if user submitted answer & it was passed to grading script. 
+                submissions = json.loads(args[0])
+                res = globals()[passed_phase](submissions)
+            else:
+                # This code executes if no submission made from user
+                res = globals()[passed_phase]()
+                
+            for key,val in res.items():
+                print(key, ' : ', val)
         else:
-            res = phase3(submissions)
-        for key,val in res.items():
-            print(key, ' : ', val)
+            # This code will execute if phases are disabled BUT there is still a submission from the user. For this example, we will execute all the functions above. 
+            submissions = json.loads(args[0])
+            res = dict()
+            for phase in phases:    
+                res.update(globals()[phase](submissions))
+                
+            for key,val in res.items():
+                print(key, ' : ', val)
     else:
         ## This code will execute if no args were passed, which means that phases are disabled & no submissions occur from user
         res = dict()
